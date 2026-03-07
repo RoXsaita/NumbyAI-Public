@@ -1,0 +1,30 @@
+This is a retry because the previous output was invalid or incomplete.
+
+Return only a JSON array.
+Return exactly one object for every transaction id shown below.
+Allowed category values:
+{{categories}}
+If you are unsure, return "MANUAL_REVIEW".
+
+{{rules}}
+
+Transactions to categorize:
+{{transactions}}
+
+Decision rules:
+1. Use the same decision policy as the main categorization pass.
+2. Apply existing categorization rules first.
+3. Use "description" as the primary evidence.
+4. Use merchant, vendor_payee, amount, date, and bank_name only as supporting evidence.
+5. Do not guess just to avoid "MANUAL_REVIEW".
+6. Do not omit any ids.
+7. Return each id exactly once.
+8. Each output item must contain only "id" and "category".
+
+{{extra_instructions}}
+
+JSON format:
+[
+  {"id": 1, "category": "Food & Groceries"},
+  {"id": 2, "category": "MANUAL_REVIEW"}
+]

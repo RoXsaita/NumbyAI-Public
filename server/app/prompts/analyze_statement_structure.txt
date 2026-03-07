@@ -1,0 +1,36 @@
+Analyze this bank statement CSV and identify its structure.
+
+Return only a JSON object.
+Use column indices as strings when possible, for example "0", "1", "2".
+If a field cannot be determined, use null and add a short question in the "questions" array.
+
+CSV sample:
+{{csv_sample}}
+
+Determine:
+1. Which columns exist.
+2. Which column contains the transaction date.
+3. Which column contains the main transaction description.
+4. Which column contains the transaction amount.
+5. Which column contains the balance, if present.
+6. What date format is used.
+7. What currency is used.
+8. Whether the first row contains headers.
+9. How many leading rows should be skipped.
+10. Whether positive amounts mean "debit" or "credit".
+
+JSON format:
+{
+  "columns_found": ["0", "1", "2", "3"],
+  "date_column": "0",
+  "description_column": "1",
+  "amount_column": "2",
+  "balance_column": "3",
+  "date_format": "DD/MM/YYYY",
+  "currency": "USD",
+  "has_headers": true,
+  "skip_rows": 0,
+  "amount_positive_is": "debit",
+  "questions": [],
+  "confidence": "high"
+}

@@ -1,0 +1,32 @@
+Categorize these bank transactions.
+
+Return only a JSON array.
+Return exactly one object for every transaction id shown below.
+Allowed category values:
+{{categories}}
+If you are unsure, return "MANUAL_REVIEW".
+
+{{rules}}
+
+Transactions to categorize:
+{{transactions}}
+
+Decision rules:
+1. Apply existing categorization rules first.
+2. Use "description" as the primary evidence.
+3. Use merchant, vendor_payee, amount, date, and bank_name only as supporting evidence.
+4. Choose a specific category only when the evidence is strong.
+5. Return "MANUAL_REVIEW" if:
+   - the description is vague, generic, or mostly reference numbers
+   - the transaction could reasonably fit more than one category
+   - the evidence is too weak to justify a specific category
+6. Prefer "MANUAL_REVIEW" over guessing.
+7. Each output item must contain only "id" and "category".
+
+{{extra_instructions}}
+
+JSON format:
+[
+  {"id": 1, "category": "Food & Groceries"},
+  {"id": 2, "category": "MANUAL_REVIEW"}
+]

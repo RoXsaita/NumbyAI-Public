@@ -1,0 +1,31 @@
+{
+  "name": "finance-budgeting-widgets",
+  "version": "1.0.0",
+  "description": "React widgets for Finance Budgeting App",
+  "type": "module",
+  "scripts": {
+    "build": "node ./scripts/build-app.mjs",
+    "build:app": "node ./scripts/build-app.mjs",
+    "dev": "NODE_ENV=development node ./scripts/build-app.mjs",
+    "build:dev": "DATA_SOURCE=mock NODE_ENV=development node ./scripts/build-app.mjs",
+    "validate:mock": "node ./scripts/validate-mock-data.mjs",
+    "test": "jest --config jest.config.cjs",
+    "test:watch": "jest --config jest.config.cjs --watch"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "esbuild": "^0.25.0",
+    "jest": "^30.0.0",
+    "sharp": "^0.34.5",
+    "ts-jest": "^29.4.0",
+    "typescript": "^5.3.0"
+  }
+}

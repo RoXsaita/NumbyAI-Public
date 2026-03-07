@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "numbyai"
+version = "1.0.0"
+description = "NumbyAI — AI-powered personal finance transaction categorizer"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "sqlalchemy>=2.0.0",
+    "alembic>=1.12.0",
+    "psycopg2-binary>=2.9.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "python-jose[cryptography]>=3.3.0",
+    "python-multipart>=0.0.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.11.0",
+    "mypy>=1.15.0",
+    "pytest-cov>=6.0.0",
+    "pre-commit>=4.0.0",
+    "types-requests>=2.32.0.20250328",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["app", "tests"]
+exclude = [".venv", "alembic", "scripts"]
+
+[tool.ruff.lint]
+select = ["E9", "F63", "F7", "F82", "B006"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["app/config.py", "app/schemas", "app/services/categorization_rules.py", "app/tools/category_helpers.py"]
+follow_imports = "skip"
+ignore_missing_imports = true
+check_untyped_defs = true
+warn_return_any = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+exclude = "(^alembic/|^scripts/|^tests/)"

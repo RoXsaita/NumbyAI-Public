@@ -1,0 +1,80 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+.cursor/
+.claude/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database
+*.db
+*.db.bak
+*.sqlite
+*.sqlite3
+
+# Uploads
+server/uploads/
+uploads/
+
+# Logs
+*.log
+logs/
+server/logs/
+
+# Temporary files
+server/temp/**/*.json
+server/temp/**/*.csv
+server/temp/**/*.txt
+!server/temp/**/.gitkeep
+!server/temp/README.md
+
+# Build outputs
+web/dist/
+
+# Process ID files
+*.pid
+.*.pid
+
+# Test artifacts
+.playwright-mcp/
+screenshots/
+test-results/
+
+# TypeScript
+*.tsbuildinfo

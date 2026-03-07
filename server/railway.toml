@@ -1,0 +1,13 @@
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "cd /app && source venv/bin/activate && uvicorn app.main:asgi_app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/health"
+healthcheckTimeout = 10
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+[[services]]
+name = "numbyai-server"
+

@@ -1,0 +1,142 @@
+import type { DashboardProps } from '../shared/schemas';
+
+export const mockDashboardData: DashboardProps = {
+  kind: 'dashboard',
+  generated_at: '2024-07-25T15:10:00Z',
+  version: '2.0.0',
+  statement: {
+    id: 'stmt_pivot_mock',
+    month: 'May–July 2024',
+    bank: 'Chase Bank',
+    currency: 'USD',
+  },
+  transactions: [
+    {
+      id: 'txn_mock_001',
+      transaction_date: '2024-07-15',
+      description: 'Salary - Acme Corp',
+      amount: 4000,
+      currency: 'USD',
+      category: 'Income',
+    },
+    {
+      id: 'txn_mock_002',
+      transaction_date: '2024-07-04',
+      description: 'Rent payment',
+      amount: -1800,
+      currency: 'USD',
+      category: 'Housing & Utilities',
+    },
+    {
+      id: 'txn_mock_003',
+      transaction_date: '2024-07-09',
+      description: 'Groceries',
+      amount: -210,
+      currency: 'USD',
+      category: 'Food & Groceries',
+    },
+  ],
+  metrics: {
+    inflows: 12800,
+    outflows: 9440,
+    internal_transfers: 1500,
+    net_cash: 1860,
+    budget_coverage_pct: 104.5,
+    latest_month: '2024-07',
+    previous_month: '2024-06',
+    month_over_month_delta: -270,
+    month_over_month_pct: -4.1,
+    segments: [
+      { name: 'inflows', actual: 12800, budget: 12600, variance: 200, variance_pct: 1.6 },
+      { name: 'outflows', actual: 9440, budget: 9030, variance: 410, variance_pct: 4.5 },
+      { name: 'internal_transfers', actual: 1500, budget: 1440, variance: 60, variance_pct: 4.2 },
+    ],
+    top_variances: [
+      { category: 'Housing & Utilities', actual: -5400, budget: -5100, variance: -300, variance_pct: 5.9, direction: 'over' },
+      { category: 'Income', actual: 12800, budget: 12600, variance: 200, variance_pct: 1.6, direction: 'over' },
+      { category: 'Food & Groceries', actual: -1880, budget: -1800, variance: -80, variance_pct: 4.4, direction: 'over' },
+    ],
+  },
+  pivot: {
+    categories: ['Income', 'Housing & Utilities', 'Food & Groceries', 'Transportation', 'Entertainment', 'Internal Transfers'],
+    months: ['2024-05', '2024-06', '2024-07'],
+    actuals: [
+      [4500, 4300, 4000],
+      [-1800, -1800, -1800],
+      [-650, -620, -610],
+      [-280, -300, -310],
+      [-400, -450, -420],
+      [-500, -500, -500],
+    ],
+    budgets: [
+      [4200, 4200, 4200],
+      [-1700, -1700, -1700],
+      [-600, -600, -600],
+      [-300, -300, -300],
+      [-410, -410, -410],
+      [-480, -480, -480],
+    ],
+    transaction_counts: [
+      [2, 2, 2],
+      [1, 1, 1],
+      [6, 6, 6],
+      [4, 4, 4],
+      [3, 3, 3],
+      [3, 3, 3],
+    ],
+    category_totals: {
+      Income: 12800,
+      'Housing & Utilities': -5400,
+      'Food & Groceries': -1880,
+      Transportation: -890,
+      Entertainment: -1270,
+      'Internal Transfers': -1500,
+    },
+    category_budget_totals: {
+      Income: 12600,
+      'Housing & Utilities': -5100,
+      'Food & Groceries': -1800,
+      Transportation: -900,
+      Entertainment: -1230,
+      'Internal Transfers': -1440,
+    },
+    month_totals: {
+      '2024-05': 870,
+      '2024-06': 630,
+      '2024-07': 360,
+    },
+    month_budget_totals: {
+      '2024-05': 710,
+      '2024-06': 710,
+      '2024-07': 710,
+    },
+    category_shares: {
+      Income: 0,
+      'Housing & Utilities': 49.4,
+      'Food & Groceries': 17.2,
+      Transportation: 8.1,
+      Entertainment: 11.6,
+      'Internal Transfers': 13.7,
+    },
+    currency: 'USD',
+  },
+  currency: 'USD',
+  banks: ['Chase', 'Amex'],
+  coverage: {
+    start: '2024-05-01',
+    end: '2024-07-31',
+  },
+  category_summaries: [
+    { category: 'Income', month: '2024-07', bank: 'Chase', amount: 4000, count: 2 },
+    { category: 'Housing & Utilities', month: '2024-07', bank: 'Chase', amount: -1800, count: 1 },
+    { category: 'Food & Groceries', month: '2024-07', bank: 'Chase', amount: -610, count: 6 },
+    { category: 'Transportation', month: '2024-07', bank: 'Chase', amount: -310, count: 4 },
+    { category: 'Entertainment', month: '2024-07', bank: 'Chase', amount: -420, count: 3 },
+    { category: 'Internal Transfers', month: '2024-07', bank: 'Chase', amount: -500, count: 3 },
+  ],
+  summary_count: 12,
+};
+
+export function getMockDashboardData(): DashboardProps {
+  return mockDashboardData;
+}

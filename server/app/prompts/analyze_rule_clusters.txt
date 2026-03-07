@@ -1,0 +1,38 @@
+Validate these deterministic category and rule findings.
+
+Return only a JSON array.
+Return exactly one object for every candidate_id shown below.
+Allowed decision values:
+- "keep"
+- "discard"
+
+Available categories:
+{{categories}}
+
+Candidate findings:
+{{candidates}}
+
+Decision rules:
+1. Use "keep" only for findings that are specific, high confidence, and practically useful.
+2. Use "discard" for anything ambiguous, weak, overly broad, or low value.
+3. For "tx_conflict", keep only if the suggested category is clearly better than the current category.
+4. For "rule_suggestion", keep only if the pattern is specific enough to avoid broad false matches.
+5. Confidence must be a number from 0.0 to 1.0.
+6. Reason must be one short English sentence.
+7. If uncertain, use "discard".
+
+JSON format:
+[
+  {
+    "candidate_id": "candidate_0",
+    "decision": "keep",
+    "confidence": 0.86,
+    "reason": "Suggested category is clearly better and the evidence is specific."
+  },
+  {
+    "candidate_id": "candidate_1",
+    "decision": "discard",
+    "confidence": 0.40,
+    "reason": "Pattern is too broad to be reliable."
+  }
+]

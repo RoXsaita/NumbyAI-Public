@@ -1,0 +1,38 @@
+Review these transaction categorizations.
+
+Return only a JSON array.
+Return exactly one object for every transaction id shown below.
+Allowed status values:
+- "confirmed"
+- "conflict"
+
+Available categories:
+{{categories}}
+
+{{rules}}
+
+Transactions to review:
+{{transactions}}
+
+Review rules:
+1. Default to "confirmed".
+2. Return "conflict" only when there is a clear, high-confidence problem.
+3. Return "confirmed" when the assigned category is reasonable, even if it is not perfect.
+4. Return "conflict" if:
+   - the description clearly indicates a different category
+   - the assigned category contradicts a user rule shown above
+   - the assigned category is "Other" and there is an obvious better category
+   - the assigned category is "MANUAL_REVIEW" but the transaction can be categorized confidently
+5. If status is "conflict", you must also return:
+   - "suggested_category": a valid category from the list above, not "MANUAL_REVIEW"
+   - "reason": one short sentence in English
+6. If status is "confirmed", do not add extra fields.
+7. Each output item must contain only "id", "status", and the conflict-only fields when needed.
+
+{{extra_instructions}}
+
+JSON format:
+[
+  {"id": 1, "status": "confirmed"},
+  {"id": 2, "status": "conflict", "suggested_category": "Food & Groceries", "reason": "Description clearly matches a grocery purchase."}
+]

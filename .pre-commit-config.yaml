@@ -1,0 +1,19 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check (server)
+        entry: bash -lc 'cd server && .venv/bin/ruff check app tests'
+        language: system
+        pass_filenames: false
+      - id: mypy
+        name: mypy (server)
+        entry: bash -lc 'cd server && .venv/bin/mypy'
+        language: system
+        pass_filenames: false
+      - id: pytest
+        name: pytest (server)
+        entry: bash -lc 'cd server && .venv/bin/pytest tests --cov=app --cov-report=term-missing'
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
