@@ -2867,7 +2867,8 @@ export const SimpleUpload: React.FC = () => {
 
                     {/* Preview Table - Scrolls with dropdowns */}
                     <table style={{
-                      width: '100%',
+                      width: 'auto',
+                      tableLayout: 'fixed',
                       borderCollapse: 'collapse',
                       fontSize: '12px',
                       fontFamily: 'monospace',
