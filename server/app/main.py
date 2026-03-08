@@ -799,7 +799,7 @@ def _build_schema_from_header_mapping(
     user_id: str,
     bank_name: Optional[str] = None,
 ) -> Dict[str, Any]:
-    statement_currency = mapping_data.get("currency") or _resolve_user_currency(user_id)
+    statement_currency = mapping_data.get("currency") or "USD"
 
     column_mappings = mapping_data.get("column_mappings", {})
     if not column_mappings:
