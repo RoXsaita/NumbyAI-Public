@@ -1,0 +1,15 @@
+Kontoauszug UBS Switzerland
+IBAN;CH93 0076 2011 6238 5295 7
+Periode;01.01.2026 - 31.01.2026
+;
+Valutadatum;Buchungsdatum;Beschreibung;Belastung;Gutschrift;Saldo
+02.01.2026;02.01.2026;Lohneingang Januar;;3'250.00;8'420.50
+02.01.2026;02.01.2026;Miete Januar;850.00;;7'570.50
+03.01.2026;03.01.2026;Swisscom Mobile;79.00;;7'491.50
+05.01.2026;05.01.2026;Migros Zürich;112.35;;7'379.15
+06.01.2026;06.01.2026;SBB Halbtax;185.00;;7'194.15
+07.01.2026;07.01.2026;Rückzahlung Peter;;75.00;7'269.15
+08.01.2026;08.01.2026;Coop Pronto;45.80;;7'223.35
+10.01.2026;10.01.2026;Krankenkasse CSS;450.00;;6'773.35
+12.01.2026;12.01.2026;Apotheke;32.50;;6'740.85
+15.01.2026;15.01.2026;AHV/IV Beiträge;125.00;;6'615.85

@@ -54,12 +54,12 @@ def parse_csv_statement(file_path: str, schema: Dict) -> List[Dict]:
             # Example: first_transaction_row=3 means skip rows 0 and 1 (rows 1 and 2 in file)
             skip_rows = max(0, first_row - 1)
         
-        # Always read without headers - this creates a DataFrame with numeric column indices (0, 1, 2, ...)
-        # This ensures consistency whether the file has headers or not
+        delimiter = schema.get("delimiter", ",")
+
         if file_path.endswith('.xlsx') or file_path.endswith('.xls'):
             df = pd.read_excel(file_path, header=None, skiprows=skip_rows)
         else:
-            df = pd.read_csv(file_path, header=None, skiprows=skip_rows)
+            df = pd.read_csv(file_path, header=None, skiprows=skip_rows, sep=delimiter)
         
         logger.info("Parsed statement file", {
             "file_path": file_path,
@@ -199,6 +199,7 @@ def parse_csv_statement(file_path: str, schema: Dict) -> List[Dict]:
         transactions = []
         date_format = schema.get('date_format', '%Y-%m-%d')
         currency = schema.get('currency', 'USD')
+        number_format = schema.get('number_format', 'auto')
         amount_positive_is = schema.get('amount_positive_is', 'debit')
         if amount_col_names:
             try:
@@ -258,14 +259,14 @@ def parse_csv_statement(file_path: str, schema: Dict) -> List[Dict]:
                         inflow_str = str(row[inflow_col_name]).strip()
                         if inflow_str and inflow_str != 'nan' and inflow_str != 'None' and inflow_str:
                             try:
-                                inflow = _parse_amount(inflow_str)
+                                inflow = _parse_amount(inflow_str, number_format)
                             except Exception:
                                 inflow = None
                     if outflow_col_name is not None and pd.notna(row.get(outflow_col_name)):
                         outflow_str = str(row[outflow_col_name]).strip()
                         if outflow_str and outflow_str != 'nan' and outflow_str != 'None' and outflow_str:
                             try:
-                                outflow = _parse_amount(outflow_str)
+                                outflow = _parse_amount(outflow_str, number_format)
                             except Exception:
                                 outflow = None
                     # Calculate amount from inflow/outflow
@@ -291,7 +292,7 @@ def parse_csv_statement(file_path: str, schema: Dict) -> List[Dict]:
                         if not amount_str or amount_str in {'nan', 'None'}:
                             continue
 
-                        parsed_component = _parse_amount(amount_str)
+                        parsed_component = _parse_amount(amount_str, number_format)
                         source_column_ref = str(amount_cols[i])
                         if amount_column_inversions.get(source_column_ref, False):
                             parsed_component = -parsed_component
@@ -336,7 +337,7 @@ def parse_csv_statement(file_path: str, schema: Dict) -> List[Dict]:
                 balance = None
                 if balance_col_name and pd.notna(row.get(balance_col_name)):
                     balance_str = str(row[balance_col_name]).strip()
-                    balance = _parse_amount(balance_str)
+                    balance = _parse_amount(balance_str, number_format)
                 
                 # Get transaction ID from first column if specified
                 transaction_id = None
@@ -443,21 +444,24 @@ def _resolve_column_name(df: pd.DataFrame, column_ref: str):
 
 def _parse_date(date_str: str, date_format: str) -> date:
     """Parse date string using provided format. Handles datetime strings with time components."""
-    # Common date format mappings
     format_mappings = {
         'MM/DD/YYYY': '%m/%d/%Y',
         'DD/MM/YYYY': '%d/%m/%Y',
         'YYYY-MM-DD': '%Y-%m-%d',
         'MM-DD-YYYY': '%m-%d-%Y',
         'DD-MM-YYYY': '%d-%m-%Y',
+        'YYYY/MM/DD': '%Y/%m/%d',
+        'DD.MM.YYYY': '%d.%m.%Y',
+        'DD Mon YYYY': '%d %b %Y',
+        'DD/MM/YY': '%d/%m/%y',
+        'DD-MM-YY': '%d-%m-%y',
+        'YYYYMMDD': '%Y%m%d',
     }
 
     python_format = format_mappings.get(date_format, date_format)
 
-    # Strip time component if present (e.g. "2026-01-02 18:02:44" or "2026-01-02T18:02:44Z")
     date_only = re.split(r'[T ]', date_str.strip())[0]
 
-    # Try the configured format with and without time component
     for ds in ([date_str, date_only] if date_only != date_str.strip() else [date_str]):
         for fmt in [python_format, python_format + ' %H:%M:%S', python_format + 'T%H:%M:%S']:
             try:
@@ -465,9 +469,13 @@ def _parse_date(date_str: str, date_format: str) -> date:
             except ValueError:
                 continue
 
-    # Try common fallback formats on both full string and date-only portion
+    _FALLBACK_FORMATS = [
+        '%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y', '%Y/%m/%d',
+        '%d-%m-%Y', '%m-%d-%Y', '%d.%m.%Y', '%d %b %Y',
+        '%d/%m/%y', '%d-%m-%y', '%Y%m%d',
+    ]
     for ds in ([date_str, date_only] if date_only != date_str.strip() else [date_str]):
-        for fmt in ['%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y', '%Y/%m/%d', '%d-%m-%Y', '%m-%d-%Y']:
+        for fmt in _FALLBACK_FORMATS:
             try:
                 return datetime.strptime(ds.strip(), fmt).date()
             except ValueError:
@@ -476,50 +484,52 @@ def _parse_date(date_str: str, date_format: str) -> date:
     raise ValueError(f"Could not parse date: {date_str} with format: {date_format}")
 
 
-def _parse_amount(amount_str: str) -> Decimal:
+def _parse_amount(amount_str: str, number_format: str = "auto") -> Decimal:
     """Parse amount string, handling currency symbols, commas, parentheses for negatives.
 
+    Args:
+        amount_str: Raw amount string from the CSV cell.
+        number_format: Hint from the analyzer — ``"us"`` (comma=thousands, dot=decimal),
+            ``"eu"`` (dot=thousands, comma=decimal), or ``"auto"`` (guess per value).
+
     Handles formats:
-    - US:       1,234.56  → 1234.56
-    - European: 1.234,56  → 1234.56
-    - Swiss:    1'234.56  → 1234.56
-    - Plain:    -104.77   → -104.77
-    - Ambiguous comma: 1,234 treated as thousands (1234); 104,77 treated as decimal (104.77)
+    - US:       1,234.56  -> 1234.56
+    - European: 1.234,56  -> 1234.56
+    - Swiss:    1'234.56  -> 1234.56
+    - Plain:    -104.77   -> -104.77
     """
-    # Remove currency symbols, non-breaking spaces, apostrophe thousands separators
-    amount_str = re.sub(r"[$€£¥zł]", '', amount_str)
+    amount_str = re.sub(r"[$€£¥zł₹₽₩₪₺₴₿]", '', amount_str, flags=re.IGNORECASE)
     amount_str = amount_str.replace('\xa0', '').replace(' ', '').replace("'", '')
 
-    # Handle parentheses for negatives (accounting format)
     if amount_str.startswith('(') and amount_str.endswith(')'):
         amount_str = '-' + amount_str[1:-1]
 
-    if ',' in amount_str and '.' in amount_str:
-        # Both separators present — rightmost is decimal
-        if amount_str.rfind(',') > amount_str.rfind('.'):
-            # European: 1.234,56
-            amount_str = amount_str.replace('.', '').replace(',', '.')
-        else:
-            # US: 1,234.56
-            amount_str = amount_str.replace(',', '')
-    elif ',' in amount_str and '.' not in amount_str:
-        comma_count = amount_str.count(',')
-        if comma_count > 1:
-            # Multiple commas → all are thousands separators: 1,234,567
-            amount_str = amount_str.replace(',', '')
-        else:
-            # Single comma: check digit count after comma
-            digits_after = amount_str.lstrip('-+').split(',')[-1]
-            if len(digits_after) == 3 and digits_after.isdigit():
-                # Looks like thousands separator (e.g. 1,234) → remove comma
+    if number_format == "eu":
+        # Dots are thousands separators, commas are decimal
+        amount_str = amount_str.replace('.', '').replace(',', '.')
+    elif number_format == "us":
+        # Commas are thousands separators, dots are decimal
+        amount_str = amount_str.replace(',', '')
+    else:
+        # Auto-detect per value (original logic)
+        if ',' in amount_str and '.' in amount_str:
+            if amount_str.rfind(',') > amount_str.rfind('.'):
+                amount_str = amount_str.replace('.', '').replace(',', '.')
+            else:
+                amount_str = amount_str.replace(',', '')
+        elif ',' in amount_str and '.' not in amount_str:
+            comma_count = amount_str.count(',')
+            if comma_count > 1:
                 amount_str = amount_str.replace(',', '')
             else:
-                # Decimal separator (e.g. 104,77 or 0,5)
-                amount_str = amount_str.replace(',', '.')
-    elif '.' in amount_str and ',' not in amount_str:
-        if amount_str.count('.') > 1:
-            # Multiple periods → all are thousands separators: 1.234.567
-            amount_str = amount_str.replace('.', '')
+                digits_after = amount_str.lstrip('-+').split(',')[-1]
+                if len(digits_after) == 3 and digits_after.isdigit():
+                    amount_str = amount_str.replace(',', '')
+                else:
+                    amount_str = amount_str.replace(',', '.')
+        elif '.' in amount_str and ',' not in amount_str:
+            if amount_str.count('.') > 1:
+                amount_str = amount_str.replace('.', '')
 
     amount_str = amount_str.strip()
 

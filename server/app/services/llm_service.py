@@ -183,3 +183,68 @@ def call_llm_json_array(
         if provider_override
         else f"Unsupported llm_provider: {settings.llm_provider}"
     )
+
+
+def _extract_json_object(raw_text: str) -> Dict[str, Any]:
+    """Extract a single JSON object from LLM output (may contain markdown fences)."""
+    decoder = json.JSONDecoder()
+    cleaned = _strip_ansi(raw_text).strip()
+    candidates = [match.group(1).strip() for match in _CODE_FENCE_RE.finditer(cleaned)]
+    candidates.append(cleaned)
+
+    for candidate in candidates:
+        if not candidate:
+            continue
+        try:
+            parsed = json.loads(candidate)
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError:
+            pass
+
+        for idx, char in enumerate(candidate):
+            if char != "{":
+                continue
+            try:
+                parsed, end_idx = decoder.raw_decode(candidate[idx:])
+            except json.JSONDecodeError:
+                continue
+            if isinstance(parsed, dict):
+                return parsed
+
+    raise ValueError("LLM did not return a JSON object")
+
+
+def _call_ollama_json_object(prompt: str, response_schema: Dict[str, Any]) -> Dict[str, Any]:
+    model = settings.ollama_model
+    url = f"{settings.ollama_url}{_GENERATE_ENDPOINT}"
+    payload: Dict[str, Any] = {
+        "model": model,
+        "prompt": prompt,
+        "stream": False,
+        "format": response_schema,
+        "options": {"temperature": 0},
+    }
+    if settings.ollama_think is not None:
+        payload["think"] = settings.ollama_think
+
+    logger.info("Calling Ollama (json_object)", {"model": model, "prompt_length": len(prompt)})
+    resp = requests.post(url, json=payload, timeout=settings.llm_timeout_seconds)
+    resp.raise_for_status()
+    return _extract_json_object(resp.json().get("response", "{}"))
+
+
+def call_llm_json_object(
+    prompt: str,
+    response_schema: Dict[str, Any],
+    provider_override: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Call the configured provider and parse a single JSON object response."""
+    provider = get_effective_llm_provider(provider_override)
+    if provider == "ollama":
+        return _call_ollama_json_object(prompt, response_schema)
+    raise ValueError(
+        f"Unsupported llm_provider: {provider_override}"
+        if provider_override
+        else f"Unsupported llm_provider: {settings.llm_provider}"
+    )

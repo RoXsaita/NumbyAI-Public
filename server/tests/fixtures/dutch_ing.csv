@@ -1,0 +1,11 @@
+Datum;Naam / Omschrijving;Rekening;Tegenrekening;Code;Af Bij;Bedrag (EUR);Mutatiesoort;Mededelingen
+20260102;Salaris Januari;NL91ABNA0417164300;NL20INGB0001234567;GT;Bij;3250,00;Internetbankieren;Salaris
+20260102;Huur Januari;NL91ABNA0417164300;NL44RABO0123456789;BA;Af;850,00;Automatische incasso;Huur woning
+20260103;Energiebedrijf;NL91ABNA0417164300;NL22KNAB0123456789;BA;Af;94,30;Automatische incasso;Voorschot energie
+20260105;Albert Heijn;NL91ABNA0417164300;;BA;Af;67,43;Betaalautomaat;Boodschappen
+20260106;Netflix;NL91ABNA0417164300;NL33TRIO0123456789;BA;Af;12,99;Automatische incasso;Abonnement
+20260107;Terugbetaling;NL91ABNA0417164300;NL55ASNB0123456789;GT;Bij;45,00;Overschrijving;Terugbetaling etentje
+20260108;Jumbo Supermarkt;NL91ABNA0417164300;;BA;Af;52,18;Betaalautomaat;Boodschappen
+20260110;T-Mobile;NL91ABNA0417164300;NL66ABNA0987654321;BA;Af;25,00;Automatische incasso;Telefoon abonnement
+20260112;Kruidvat;NL91ABNA0417164300;;BA;Af;15,80;Betaalautomaat;Drogisterij
+20260115;Zorgverzekering;NL91ABNA0417164300;NL77RABO0987654321;BA;Af;135,00;Automatische incasso;Premie januari

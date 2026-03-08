@@ -328,6 +328,7 @@ async def health() -> JSONResponse:
 
 def _read_csv_preview(
     file_path: Path,
+    delimiter: str = ",",
 ) -> tuple[list[list[str]], int, int]:
     """Read full statement data for mapping UI (preview_data, total_rows, total_columns)."""
     import pandas as pd
@@ -335,7 +336,10 @@ def _read_csv_preview(
     if file_path.suffix.lower() in {".xlsx", ".xls"}:
         df_full = pd.read_excel(str(file_path), dtype=str, keep_default_na=False, header=None)
     else:
-        df_full = pd.read_csv(str(file_path), dtype=str, keep_default_na=False, header=None)
+        df_full = pd.read_csv(
+            str(file_path), dtype=str, keep_default_na=False, header=None,
+            sep=delimiter,
+        )
     preview_data: list[list[str]] = df_full.values.tolist()
     total_rows = len(df_full)
     total_columns = len(df_full.columns) if total_rows > 0 else 0
@@ -525,8 +529,11 @@ async def upload_statement(request: Request) -> JSONResponse:
                 preview_data: list[list[str]] = []
                 total_rows = 0
                 total_columns = 0
+                saved_delimiter = existing_schema.get("delimiter", ",")
                 try:
-                    preview_data, total_rows, total_columns = _read_csv_preview(file_path)
+                    preview_data, total_rows, total_columns = _read_csv_preview(
+                        file_path, delimiter=saved_delimiter,
+                    )
                 except Exception as e:
                     logger.warn("Failed to read preview data for existing bank", {"error": str(e)})
 
@@ -552,8 +559,12 @@ async def upload_statement(request: Request) -> JSONResponse:
         preview_data: list[list[str]] = []
         total_rows = 0
         total_columns = 0
+        suggested_mappings = analysis.get("suggested_mappings")
+        detected_delimiter = (suggested_mappings or {}).get("delimiter", ",")
         try:
-            preview_data, total_rows, total_columns = _read_csv_preview(file_path)
+            preview_data, total_rows, total_columns = _read_csv_preview(
+                file_path, delimiter=detected_delimiter,
+            )
             detected_headers = preview_data[0] if preview_data else []
         except Exception as e:
             logger.warn("Failed to read CSV headers/preview", {"error": str(e)})
@@ -564,6 +575,7 @@ async def upload_statement(request: Request) -> JSONResponse:
             "job_id": str(uuid.uuid4()),
             "status": "validation_required",
             "analysis": analysis,
+            "suggested_mappings": suggested_mappings,
             "currency_detected": currency_detected,
             "currency_required": not bool(user_currency),
             "parsing_preferences_exist": bool(saved_mappings),
@@ -710,6 +722,8 @@ def _build_schema_from_header_mapping(
         "column_mappings": column_mappings,
         "date_format": mapping_data.get("date_format", "DD/MM/YYYY"),
         "currency": currency,
+        "number_format": mapping_data.get("number_format", "auto"),
+        "delimiter": mapping_data.get("delimiter", ","),
         "has_headers": False,
         "skip_rows": 0,
         "first_transaction_row": mapping_data.get("first_transaction_row", 1),

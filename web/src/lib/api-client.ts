@@ -555,6 +555,8 @@ class ApiClient {
       first_transaction_row?: number;
       date_format?: string;
       currency?: string;
+      number_format?: string;
+      delimiter?: string;
     }
   ): Promise<void> {
     const schema = {
@@ -563,8 +565,10 @@ class ApiClient {
       invert_amount_sign: mapping.invert_amount_sign || false,
       date_format: mapping.date_format || 'DD/MM/YYYY',
       currency: mapping.currency || 'USD',
+      number_format: mapping.number_format || 'auto',
+      delimiter: mapping.delimiter || ',',
       has_headers: mapping.has_headers ?? true,
-      skip_rows: 0,  // Will be calculated from first_transaction_row in parser
+      skip_rows: 0,
       first_transaction_row: mapping.first_transaction_row || 1,
       amount_positive_is: 'debit',
     };

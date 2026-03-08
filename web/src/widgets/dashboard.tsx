@@ -2952,6 +2952,10 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
   const [reviewRulePattern, setReviewRulePattern] = useState('');
   const [skippedIds, setSkippedIds] = useState<Set<string>>(new Set());
   const [isSavingReview, setIsSavingReview] = useState(false);
+  const [selectedReviewIds, setSelectedReviewIds] = useState<Set<string>>(new Set());
+  const [bulkReviewCategory, setBulkReviewCategory] = useState('');
+  const [isBulkSaving, setIsBulkSaving] = useState(false);
+  const [expandedReviewTxId, setExpandedReviewTxId] = useState<string | null>(null);
   const [ruleAnalysisRun, setRuleAnalysisRun] = useState<ApiRuleAnalysisRun | null>(null);
   const [ruleAnalysisRunId, setRuleAnalysisRunId] = useState<string | null>(null);
   const [isStartingRuleAnalysis, setIsStartingRuleAnalysis] = useState(false);
@@ -4518,8 +4522,9 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
   }, [ruleAnalysisRunId, ruleAnalysisRun, loadRuleAnalysisFindings]);
 
   const currentReviewTx = React.useMemo(() => {
-    return manualReviewTransactions.find(tx => !skippedIds.has(tx.id));
-  }, [manualReviewTransactions, skippedIds]);
+    if (!expandedReviewTxId) return null;
+    return manualReviewTransactions.find(tx => tx.id === expandedReviewTxId && !skippedIds.has(tx.id)) ?? null;
+  }, [manualReviewTransactions, skippedIds, expandedReviewTxId]);
 
   const remainingReviewCount = React.useMemo(() => {
     return manualReviewTransactions.filter(tx => !skippedIds.has(tx.id)).length;
@@ -4590,6 +4595,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
       }
       setManualReviewTransactions(prev => prev.filter(tx => tx.id !== currentReviewTx.id));
       setManualReviewTotal(prev => prev - 1);
+      setExpandedReviewTxId(null);
       setReviewCategory('');
       setReviewCreateRule(false);
       setReviewRulePattern('');
@@ -4603,9 +4609,41 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
   const handleReviewSkip = () => {
     if (!currentReviewTx) return;
     setSkippedIds(prev => new Set([...prev, currentReviewTx.id]));
+    setExpandedReviewTxId(null);
     setReviewCategory('');
     setReviewCreateRule(false);
     setReviewRulePattern('');
+  };
+
+  const handleBulkCategorize = async () => {
+    if (!bulkReviewCategory || selectedReviewIds.size === 0) return;
+    setIsBulkSaving(true);
+    try {
+      const ids = Array.from(selectedReviewIds);
+      await Promise.all(ids.map(id => {
+        const tx = manualReviewTransactions.find(t => t.id === id);
+        if (!tx) return Promise.resolve();
+        if (tx._review_type === 'conflict') {
+          return apiClient.resolveConflict({ id, chosen_category: bulkReviewCategory });
+        }
+        return apiClient.categorizeManualReview({ id, category: bulkReviewCategory });
+      }));
+      const removedCount = ids.filter(id => manualReviewTransactions.some(tx => tx.id === id)).length;
+      setManualReviewTransactions(prev => prev.filter(tx => !selectedReviewIds.has(tx.id)));
+      setManualReviewTotal(prev => prev - removedCount);
+      if (expandedReviewTxId && selectedReviewIds.has(expandedReviewTxId)) {
+        setExpandedReviewTxId(null);
+        setReviewCategory('');
+        setReviewCreateRule(false);
+        setReviewRulePattern('');
+      }
+      setSelectedReviewIds(new Set());
+      setBulkReviewCategory('');
+    } catch (error) {
+      console.error('Bulk categorize error:', error);
+    } finally {
+      setIsBulkSaving(false);
+    }
   };
 
   // Data Management handlers
@@ -6839,218 +6877,243 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
                 </div>
               )}
 
-              {reviewSource === 'upload_review' && !manualReviewLoading && currentReviewTx && (
-                <div style={{
-                  maxWidth: 600,
-                  margin: '0 auto',
-                  padding: SPACING.xl,
-                  background: colors.bg.secondary,
-                  borderRadius: 12,
-                  border: `1px solid ${colors.border.default}`,
-                }}>
-                  {/* Transaction info */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: SPACING.md }}>
-                    <span style={{ fontSize: TYPOGRAPHY.sizes.sm, color: colors.text.secondary }}>
-                      {currentReviewTx.date}
-                    </span>
-                    <span style={{ fontSize: TYPOGRAPHY.sizes.sm, color: colors.text.secondary }}>
-                      {currentReviewTx.bank_name}
-                    </span>
-                  </div>
-
-                  <div style={{ marginBottom: SPACING.sm }}>
-                    <div style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary, marginBottom: 2 }}>Description</div>
-                    <div style={{ fontSize: TYPOGRAPHY.sizes.md, fontWeight: TYPOGRAPHY.weights.medium, color: colors.text.primary, wordBreak: 'break-word' }}>
-                      {currentReviewTx.description}
-                    </div>
-                  </div>
-
-                  {currentReviewTx.merchant && (
-                    <div style={{ marginBottom: SPACING.sm }}>
-                      <div style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary, marginBottom: 2 }}>Merchant</div>
-                      <div style={{ fontSize: TYPOGRAPHY.sizes.sm, color: colors.text.primary }}>
-                        {currentReviewTx.merchant}
+              {reviewSource === 'upload_review' && !manualReviewLoading && manualReviewTransactions.length > 0 && (() => {
+                const pendingTxs = manualReviewTransactions.filter(tx => !skippedIds.has(tx.id));
+                const allPendingSelected = pendingTxs.length > 0 && pendingTxs.every(tx => selectedReviewIds.has(tx.id));
+                const somePendingSelected = pendingTxs.some(tx => selectedReviewIds.has(tx.id));
+                const skippedCount = manualReviewTransactions.length - pendingTxs.length;
+                return (
+                  <div>
+                    {/* Bulk action toolbar */}
+                    {selectedReviewIds.size > 0 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.sm, flexWrap: 'wrap', marginBottom: SPACING.md, padding: SPACING.md, background: colors.bg.secondary, border: `1px solid ${colors.border.default}`, borderRadius: 8 }}>
+                        <span style={{ fontSize: TYPOGRAPHY.sizes.sm, color: colors.text.secondary, whiteSpace: 'nowrap' }}>
+                          {selectedReviewIds.size} selected
+                        </span>
+                        <select
+                          value={bulkReviewCategory}
+                          onChange={(e) => setBulkReviewCategory(e.target.value)}
+                          style={{ flex: 1, minWidth: 160, padding: `${SPACING.xs}px ${SPACING.sm}px`, fontSize: TYPOGRAPHY.sizes.sm, border: `1px solid ${colors.border.default}`, borderRadius: 6, background: colors.bg.primary, color: colors.text.primary }}
+                        >
+                          <option value="">Assign category...</option>
+                          {SPENDING_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                        </select>
+                        <button
+                          onClick={handleBulkCategorize}
+                          disabled={!bulkReviewCategory || isBulkSaving}
+                          style={{ padding: `${SPACING.xs}px ${SPACING.md}px`, fontSize: TYPOGRAPHY.sizes.sm, fontWeight: TYPOGRAPHY.weights.medium, background: colors.primary, color: colors.bg.primary, border: 'none', borderRadius: 6, cursor: !bulkReviewCategory || isBulkSaving ? 'not-allowed' : 'pointer', opacity: !bulkReviewCategory || isBulkSaving ? 0.6 : 1, whiteSpace: 'nowrap' }}
+                        >
+                          {isBulkSaving ? 'Saving...' : 'Apply to Selected'}
+                        </button>
+                        <button
+                          onClick={() => setSelectedReviewIds(new Set())}
+                          style={{ padding: `${SPACING.xs}px ${SPACING.sm}px`, fontSize: TYPOGRAPHY.sizes.sm, color: colors.text.secondary, background: 'transparent', border: 'none', cursor: 'pointer' }}
+                        >
+                          Clear
+                        </button>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  <div style={{ marginBottom: SPACING.lg }}>
-                    <div style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary, marginBottom: 2 }}>Amount</div>
-                    <div style={{
-                      fontSize: TYPOGRAPHY.sizes.lg,
-                      fontWeight: TYPOGRAPHY.weights.semibold,
-                      color: currentReviewTx.amount < 0 ? colors.text.negative : colors.text.positive,
-                    }}>
-                      {currentReviewTx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currentReviewTx.currency}
-                    </div>
-                  </div>
+                    {/* Transaction list */}
+                    <div style={{ border: `1px solid ${colors.border.default}`, borderRadius: 8, overflow: 'hidden' }}>
+                      {/* Header row */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 110px 90px 80px 110px', gap: SPACING.sm, padding: `${SPACING.sm}px ${SPACING.md}px`, background: colors.bg.secondary, borderBottom: `1px solid ${colors.border.default}`, alignItems: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={allPendingSelected}
+                          ref={(el) => { if (el) el.indeterminate = somePendingSelected && !allPendingSelected; }}
+                          onChange={() => {
+                            if (allPendingSelected) {
+                              setSelectedReviewIds(new Set());
+                            } else {
+                              setSelectedReviewIds(new Set(pendingTxs.map(tx => tx.id)));
+                            }
+                          }}
+                          style={{ cursor: 'pointer', width: 14, height: 14 }}
+                        />
+                        <span style={{ fontSize: TYPOGRAPHY.sizes.xs, fontWeight: TYPOGRAPHY.weights.semibold, color: colors.text.secondary }}>Description</span>
+                        <span style={{ fontSize: TYPOGRAPHY.sizes.xs, fontWeight: TYPOGRAPHY.weights.semibold, color: colors.text.secondary, textAlign: 'right' }}>Amount</span>
+                        <span style={{ fontSize: TYPOGRAPHY.sizes.xs, fontWeight: TYPOGRAPHY.weights.semibold, color: colors.text.secondary }}>Date</span>
+                        <span style={{ fontSize: TYPOGRAPHY.sizes.xs, fontWeight: TYPOGRAPHY.weights.semibold, color: colors.text.secondary }}>Bank</span>
+                        <span />
+                      </div>
 
-                  {currentReviewTx._review_type === 'conflict' && (
-                    <div style={{
-                      marginBottom: SPACING.lg,
-                      padding: SPACING.md,
-                      background: '#f5f3ff',
-                      borderRadius: 8,
-                      border: '1px solid #c4b5fd',
-                    }}>
-                      <div style={{
-                        fontSize: TYPOGRAPHY.sizes.xs,
-                        fontWeight: TYPOGRAPHY.weights.semibold,
-                        color: '#7c3aed',
-                        marginBottom: SPACING.sm,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                      }}>
-                        AI Conflict
-                      </div>
-                      <div style={{ display: 'flex', gap: SPACING.md, marginBottom: currentReviewTx.review_reason ? SPACING.sm : 0 }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary }}>Categorizer says</div>
-                          <div style={{ fontSize: TYPOGRAPHY.sizes.sm, fontWeight: TYPOGRAPHY.weights.medium, color: colors.text.primary }}>{currentReviewTx.category}</div>
+                      {pendingTxs.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: `${SPACING.xl}px ${SPACING.md}px`, color: colors.text.secondary }}>
+                          <div style={{ marginBottom: SPACING.sm }}>All transactions reviewed.</div>
+                          {skippedCount > 0 && (
+                            <button onClick={() => setSkippedIds(new Set())} style={{ fontSize: TYPOGRAPHY.sizes.sm, color: colors.primary, background: 'transparent', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                              Show {skippedCount} skipped
+                            </button>
+                          )}
                         </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary }}>Reviewer says</div>
-                          <div style={{ fontSize: TYPOGRAPHY.sizes.sm, fontWeight: TYPOGRAPHY.weights.semibold, color: '#7c3aed' }}>{currentReviewTx.review_category}</div>
-                        </div>
-                      </div>
-                      {currentReviewTx.review_reason && (
-                        <div style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary, fontStyle: 'italic' }}>
-                          {currentReviewTx.review_reason}
-                        </div>
+                      ) : (
+                        pendingTxs.map((tx, idx) => (
+                          <div key={tx.id}>
+                            {/* Row */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 110px 90px 80px 110px', gap: SPACING.sm, padding: `${SPACING.sm}px ${SPACING.md}px`, alignItems: 'center', borderTop: idx === 0 ? 'none' : `1px solid ${colors.border.default}`, background: selectedReviewIds.has(tx.id) ? (theme === 'dark' ? 'rgba(99,102,241,0.08)' : '#f5f3ff') : expandedReviewTxId === tx.id ? colors.bg.secondary : 'transparent' }}>
+                              <input
+                                type="checkbox"
+                                checked={selectedReviewIds.has(tx.id)}
+                                onChange={() => {
+                                  setSelectedReviewIds(prev => {
+                                    const next = new Set(prev);
+                                    if (next.has(tx.id)) next.delete(tx.id); else next.add(tx.id);
+                                    return next;
+                                  });
+                                }}
+                                style={{ cursor: 'pointer', width: 14, height: 14 }}
+                              />
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontSize: TYPOGRAPHY.sizes.sm, color: colors.text.primary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx.description || '-'}</div>
+                                {tx.merchant && tx.merchant !== tx.description && (
+                                  <div style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx.merchant}</div>
+                                )}
+                                {tx._review_type === 'conflict' && (
+                                  <span style={{ display: 'inline-block', marginTop: 2, fontSize: TYPOGRAPHY.sizes.xs, color: '#7c3aed', background: '#f5f3ff', border: '1px solid #c4b5fd', borderRadius: 4, padding: '1px 5px' }}>conflict</span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: TYPOGRAPHY.sizes.sm, fontWeight: TYPOGRAPHY.weights.medium, color: tx.amount < 0 ? colors.text.negative : colors.text.positive, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                {tx.amount?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {tx.currency}
+                              </div>
+                              <div style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary, whiteSpace: 'nowrap' }}>{tx.date}</div>
+                              <div style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx.bank_name || '-'}</div>
+                              <div style={{ display: 'flex', gap: SPACING.xs, justifyContent: 'flex-end' }}>
+                                <button
+                                  onClick={() => {
+                                    if (expandedReviewTxId === tx.id) {
+                                      setExpandedReviewTxId(null);
+                                      setReviewCategory('');
+                                      setReviewCreateRule(false);
+                                      setReviewRulePattern('');
+                                    } else {
+                                      setExpandedReviewTxId(tx.id);
+                                      setReviewCategory('');
+                                      setReviewCreateRule(false);
+                                      setReviewRulePattern('');
+                                    }
+                                  }}
+                                  style={{ padding: `2px ${SPACING.sm}px`, fontSize: TYPOGRAPHY.sizes.xs, color: expandedReviewTxId === tx.id ? colors.bg.primary : colors.primary, background: expandedReviewTxId === tx.id ? colors.primary : 'transparent', border: `1px solid ${colors.primary}`, borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                                >
+                                  {expandedReviewTxId === tx.id ? 'Close' : 'Review'}
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setSkippedIds(prev => new Set([...prev, tx.id]));
+                                    if (expandedReviewTxId === tx.id) {
+                                      setExpandedReviewTxId(null);
+                                      setReviewCategory('');
+                                    }
+                                    setSelectedReviewIds(prev => { const next = new Set(prev); next.delete(tx.id); return next; });
+                                  }}
+                                  style={{ padding: `2px ${SPACING.sm}px`, fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary, background: 'transparent', border: `1px solid ${colors.border.default}`, borderRadius: 4, cursor: 'pointer' }}
+                                >
+                                  Skip
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Expanded detail panel */}
+                            {expandedReviewTxId === tx.id && currentReviewTx && (
+                              <div style={{ padding: SPACING.lg, background: colors.bg.secondary, borderTop: `1px solid ${colors.border.default}` }}>
+                                {tx._review_type === 'conflict' && (
+                                  <div style={{ marginBottom: SPACING.lg, padding: SPACING.md, background: '#f5f3ff', borderRadius: 8, border: '1px solid #c4b5fd' }}>
+                                    <div style={{ fontSize: TYPOGRAPHY.sizes.xs, fontWeight: TYPOGRAPHY.weights.semibold, color: '#7c3aed', marginBottom: SPACING.sm, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                      AI Conflict
+                                    </div>
+                                    <div style={{ display: 'flex', gap: SPACING.md, marginBottom: tx.review_reason ? SPACING.sm : 0 }}>
+                                      <div style={{ flex: 1 }}>
+                                        <div style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary }}>Categorizer says</div>
+                                        <div style={{ fontSize: TYPOGRAPHY.sizes.sm, fontWeight: TYPOGRAPHY.weights.medium, color: colors.text.primary }}>{tx.category}</div>
+                                      </div>
+                                      <div style={{ flex: 1 }}>
+                                        <div style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary }}>Reviewer says</div>
+                                        <div style={{ fontSize: TYPOGRAPHY.sizes.sm, fontWeight: TYPOGRAPHY.weights.semibold, color: '#7c3aed' }}>{tx.review_category}</div>
+                                      </div>
+                                    </div>
+                                    {tx.review_reason && (
+                                      <div style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary, fontStyle: 'italic' }}>{tx.review_reason}</div>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Category selection */}
+                                <div style={{ marginBottom: SPACING.md }}>
+                                  <label style={{ display: 'block', fontSize: TYPOGRAPHY.sizes.sm, fontWeight: TYPOGRAPHY.weights.medium, color: colors.text.primary, marginBottom: SPACING.xs }}>
+                                    Category
+                                  </label>
+                                  <select
+                                    value={reviewCategory}
+                                    onChange={(e) => setReviewCategory(e.target.value)}
+                                    style={{ width: '100%', maxWidth: 400, padding: `${SPACING.sm}px ${SPACING.md}px`, fontSize: TYPOGRAPHY.sizes.base, border: `1px solid ${colors.border.default}`, borderRadius: 6, background: colors.bg.primary, color: colors.text.primary }}
+                                  >
+                                    <option value="">Select category...</option>
+                                    {SPENDING_CATEGORIES.map(cat => (
+                                      <option key={cat} value={cat}>{cat}</option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                {/* Create rule checkbox */}
+                                <div style={{ marginBottom: SPACING.md }}>
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: SPACING.sm, cursor: 'pointer' }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={reviewCreateRule}
+                                      onChange={(e) => {
+                                        setReviewCreateRule(e.target.checked);
+                                        if (e.target.checked && !reviewRulePattern) {
+                                          setReviewRulePattern(tx.description);
+                                        }
+                                      }}
+                                    />
+                                    <span style={{ fontSize: TYPOGRAPHY.sizes.sm, color: colors.text.primary }}>
+                                      Create rule for this pattern
+                                    </span>
+                                  </label>
+                                </div>
+
+                                {reviewCreateRule && (
+                                  <div style={{ marginBottom: SPACING.md, paddingLeft: SPACING.lg }}>
+                                    <label style={{ display: 'block', fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary, marginBottom: SPACING.xs }}>
+                                      Pattern (regex, matches description & merchant)
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={reviewRulePattern}
+                                      onChange={(e) => setReviewRulePattern(e.target.value)}
+                                      style={{ width: '100%', maxWidth: 400, padding: SPACING.xs, fontSize: TYPOGRAPHY.sizes.sm, border: `1px solid ${colors.border.default}`, borderRadius: 4, background: colors.bg.primary, color: colors.text.primary, boxSizing: 'border-box' }}
+                                    />
+                                  </div>
+                                )}
+
+                                {/* Action buttons */}
+                                <div style={{ display: 'flex', gap: SPACING.sm }}>
+                                  <button
+                                    onClick={handleReviewSave}
+                                    disabled={!reviewCategory || isSavingReview}
+                                    style={{ padding: `${SPACING.sm}px ${SPACING.lg}px`, fontSize: TYPOGRAPHY.sizes.sm, fontWeight: TYPOGRAPHY.weights.medium, color: colors.bg.primary, background: colors.primary, border: 'none', borderRadius: 6, cursor: !reviewCategory || isSavingReview ? 'not-allowed' : 'pointer', opacity: !reviewCategory || isSavingReview ? 0.6 : 1 }}
+                                  >
+                                    {isSavingReview ? 'Saving...' : 'Save'}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))
                       )}
                     </div>
-                  )}
 
-                  {/* Category selection */}
-                  <div style={{ marginBottom: SPACING.md }}>
-                    <label style={{ display: 'block', fontSize: TYPOGRAPHY.sizes.sm, fontWeight: TYPOGRAPHY.weights.medium, color: colors.text.primary, marginBottom: SPACING.xs }}>
-                      Category
-                    </label>
-                    <select
-                      value={reviewCategory}
-                      onChange={(e) => setReviewCategory(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: `${SPACING.sm}px ${SPACING.md}px`,
-                        fontSize: TYPOGRAPHY.sizes.base,
-                        border: `1px solid ${colors.border.default}`,
-                        borderRadius: 6,
-                        background: colors.bg.primary,
-                        color: colors.text.primary,
-                      }}
-                    >
-                      <option value="">Select category...</option>
-                      {SPENDING_CATEGORIES.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Create rule checkbox */}
-                  <div style={{ marginBottom: SPACING.md }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: SPACING.sm, cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={reviewCreateRule}
-                        onChange={(e) => {
-                          setReviewCreateRule(e.target.checked);
-                          if (e.target.checked && !reviewRulePattern) {
-                            setReviewRulePattern(currentReviewTx.description);
-                          }
-                        }}
-                      />
-                      <span style={{ fontSize: TYPOGRAPHY.sizes.sm, color: colors.text.primary }}>
-                        Create rule for this pattern
-                      </span>
-                    </label>
-                  </div>
-
-                  {reviewCreateRule && (
-                    <div style={{ marginBottom: SPACING.md, paddingLeft: SPACING.lg }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary, marginBottom: SPACING.xs }}>
-                          Pattern (regex, matches description & merchant)
-                        </label>
-                        <input
-                          type="text"
-                          value={reviewRulePattern}
-                          onChange={(e) => setReviewRulePattern(e.target.value)}
-                          style={{
-                            width: '100%',
-                            padding: SPACING.xs,
-                            fontSize: TYPOGRAPHY.sizes.sm,
-                            border: `1px solid ${colors.border.default}`,
-                            borderRadius: 4,
-                            background: colors.bg.primary,
-                            color: colors.text.primary,
-                            boxSizing: 'border-box',
-                          }}
-                        />
+                    {skippedCount > 0 && pendingTxs.length > 0 && (
+                      <div style={{ marginTop: SPACING.sm, textAlign: 'right' }}>
+                        <button onClick={() => setSkippedIds(new Set())} style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary, background: 'transparent', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                          Show {skippedCount} skipped
+                        </button>
                       </div>
-                    </div>
-                  )}
-
-                  {/* Action buttons */}
-                  <div style={{ display: 'flex', gap: SPACING.sm, justifyContent: 'flex-end', marginTop: SPACING.lg }}>
-                    <button
-                      onClick={handleReviewSkip}
-                      style={{
-                        padding: `${SPACING.sm}px ${SPACING.lg}px`,
-                        fontSize: TYPOGRAPHY.sizes.sm,
-                        fontWeight: TYPOGRAPHY.weights.medium,
-                        color: colors.text.primary,
-                        background: colors.bg.primary,
-                        border: `1px solid ${colors.border.default}`,
-                        borderRadius: 6,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Skip
-                    </button>
-                    <button
-                      onClick={handleReviewSave}
-                      disabled={!reviewCategory || isSavingReview}
-                      style={{
-                        padding: `${SPACING.sm}px ${SPACING.lg}px`,
-                        fontSize: TYPOGRAPHY.sizes.sm,
-                        fontWeight: TYPOGRAPHY.weights.medium,
-                        color: colors.bg.primary,
-                        background: colors.primary,
-                        border: 'none',
-                        borderRadius: 6,
-                        cursor: !reviewCategory || isSavingReview ? 'not-allowed' : 'pointer',
-                        opacity: !reviewCategory || isSavingReview ? 0.6 : 1,
-                      }}
-                    >
-                      {isSavingReview ? 'Saving...' : 'Save & Next'}
-                    </button>
+                    )}
                   </div>
-                </div>
-              )}
-
-              {reviewSource === 'upload_review' && !manualReviewLoading && manualReviewTransactions.length > 0 && !currentReviewTx && (
-                <div style={{
-                  textAlign: 'center',
-                  padding: SPACING.xl * 2,
-                  color: colors.text.secondary,
-                }}>
-                  <div style={{ fontSize: TYPOGRAPHY.sizes.lg, marginBottom: SPACING.md }}>You skipped all remaining transactions.</div>
-                  <button
-                    onClick={() => setSkippedIds(new Set())}
-                    style={{
-                      padding: `${SPACING.sm}px ${SPACING.lg}px`,
-                      fontSize: TYPOGRAPHY.sizes.sm,
-                      background: colors.primary,
-                      color: colors.bg.primary,
-                      border: 'none',
-                      borderRadius: 6,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Show skipped transactions
-                  </button>
-                </div>
-              )}
+                );
+              })()}
 
               {reviewSource === 'rules_analysis' && isLoadingRuleAnalysisFindings && (
                 <div style={{ textAlign: 'center', padding: SPACING.xl, color: colors.text.secondary }}>
@@ -7512,14 +7575,6 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
                           </div>
                           <div style={{ fontSize: TYPOGRAPHY.sizes.md, fontWeight: TYPOGRAPHY.weights.semibold, color: colors.text.primary }}>
                             {preferencesData.settings.functional_currency}
-                          </div>
-                        </div>
-                        <div style={{ padding: SPACING.md, background: colors.bg.secondary, borderRadius: 8 }}>
-                          <div style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary, marginBottom: SPACING.xs }}>
-                            Onboarding Status
-                          </div>
-                          <div style={{ fontSize: TYPOGRAPHY.sizes.md, fontWeight: TYPOGRAPHY.weights.semibold, color: preferencesData.settings.onboarding_complete ? colors.text.primary : colors.text.negative }}>
-                            {preferencesData.settings.onboarding_complete ? 'Complete' : 'Incomplete'}
                           </div>
                         </div>
                         {preferencesData.settings.profiles && preferencesData.settings.profiles.length > 0 && (

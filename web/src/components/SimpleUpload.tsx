@@ -149,6 +149,8 @@ export const SimpleUpload: React.FC = () => {
   const [pendingCategoryEdits, setPendingCategoryEdits] = useState<Record<string, string>>({});
   const [pendingRuleCreations, setPendingRuleCreations] = useState<Record<string, { enabled: boolean; pattern: string }>>({});
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  const [isAutoDetected, setIsAutoDetected] = useState(false);
+  const [detectionConfidence, setDetectionConfidence] = useState<Record<string, string>>({});
   const [isSavingReview, setIsSavingReview] = useState(false);
 
   // Observability state
@@ -705,8 +707,10 @@ export const SimpleUpload: React.FC = () => {
       await handleProcess();
     } else {
       // Need header mapping (new bank or bank with saved mappings to review/edit)
-      // Initialize first_transaction_row from analysis if available
-      if (uploadResult?.analysis?.skip_rows !== undefined) {
+      // Initialize first_transaction_row from suggested_mappings or analysis
+      if (uploadResult?.suggested_mappings?.first_transaction_row) {
+        setFirstTransactionRow(uploadResult.suggested_mappings.first_transaction_row);
+      } else if (uploadResult?.analysis?.skip_rows !== undefined) {
         setFirstTransactionRow((uploadResult.analysis.skip_rows || 0) + 1);
       }
       // Auto-load preferences if they exist, but never for new banks
@@ -766,12 +770,15 @@ export const SimpleUpload: React.FC = () => {
 
         if (hasInvalidMappings) {
           setError('Saved column mappings appear to be corrupted (contain data values instead of column indices). Please re-map your columns.');
-          // Don't load the corrupted mappings
           setColumnMappings({});
           setAmountColumnInversions({});
           setInvertAmountSign(false);
+          setIsAutoDetected(false);
+          setDetectionConfidence({});
         } else {
           setColumnMappings(mappings);
+          setIsAutoDetected(false);
+          setDetectionConfidence({});
           const savedInversions = saved.amount_column_inversions || {};
           const normalizedInversions: Record<number, boolean> = {};
           if (savedInversions && typeof savedInversions === 'object') {
@@ -787,7 +794,30 @@ export const SimpleUpload: React.FC = () => {
         }
         setFirstTransactionRow(saved.first_transaction_row ?? 1);
       } else {
-        setColumnMappings({});
+        // New bank or no saved mappings -- try auto-detection from suggested_mappings
+        const suggested = uploadResult?.suggested_mappings;
+        if (suggested?.column_mappings && Object.keys(suggested.column_mappings).length > 0) {
+          const autoMappings: { [key: number]: string } = {};
+          Object.entries(suggested.column_mappings as Record<string, string>).forEach(([colRef, fieldType]) => {
+            const idx = parseInt(colRef, 10);
+            if (!isNaN(idx) && idx >= 0 && fieldType) {
+              autoMappings[idx] = fieldType;
+            }
+          });
+          setColumnMappings(autoMappings);
+          setIsAutoDetected(true);
+          setDetectionConfidence(suggested.confidence || {});
+          if (suggested.first_transaction_row) {
+            setFirstTransactionRow(suggested.first_transaction_row);
+          }
+          if (suggested.currency && !userCurrency) {
+            setCurrency(suggested.currency);
+          }
+        } else {
+          setColumnMappings({});
+          setIsAutoDetected(false);
+          setDetectionConfidence({});
+        }
         setAmountColumnInversions({});
         setInvertAmountSign(false);
       }
@@ -851,8 +881,10 @@ export const SimpleUpload: React.FC = () => {
       invert_amount_sign: invertAmountSign,
       has_headers: false, // Always false - we use first_transaction_row instead
       first_transaction_row: firstTransactionRow,
-      date_format: uploadResult?.analysis?.date_format || 'DD/MM/YYYY',
+      date_format: uploadResult?.suggested_mappings?.date_format || uploadResult?.analysis?.date_format || 'DD/MM/YYYY',
       currency: currency || userCurrency || 'USD',
+      number_format: uploadResult?.suggested_mappings?.number_format || 'auto',
+      delimiter: uploadResult?.suggested_mappings?.delimiter || ',',
     };
 
     // Convert column index -> field type to field type -> column reference
@@ -908,7 +940,7 @@ export const SimpleUpload: React.FC = () => {
     // Validate all column references before returning
     const invalidRefs: string[] = [];
     Object.entries(result.column_mappings).forEach(([fieldType, columnRef]) => {
-      if (!validateColumnReference(columnRef)) {
+      if (!validateColumnReference(columnRef as string | string[])) {
         invalidRefs.push(`${fieldType}: ${JSON.stringify(columnRef)}`);
       }
     });
@@ -2181,7 +2213,7 @@ export const SimpleUpload: React.FC = () => {
             }}>
               {step === 'file_upload' && (isUploading ? 'Analyzing your statement...' : 'Upload your bank statement')}
               {step === 'currency_selection' && 'Select your currency'}
-              {step === 'header_mapping' && 'Map statement columns'}
+              {step === 'header_mapping' && (isAutoDetected ? 'Review detected columns' : 'Map statement columns')}
             </p>
           </div>
 
@@ -2602,18 +2634,31 @@ export const SimpleUpload: React.FC = () => {
             <div>
               {/* Instruction Box */}
               <div style={{
-                backgroundColor: '#1e40af',
+                backgroundColor: isAutoDetected ? '#065f46' : '#1e40af',
                 color: 'white',
                 padding: '16px',
                 borderRadius: '8px',
                 marginBottom: '24px',
               }}>
-                <p style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: 500 }}>
-                  Match columns. We need to match the column data. Use the dropdowns to correspond columns from your file to the appropriate fields.
-                </p>
-                <p style={{ margin: '0', fontSize: '13px', fontWeight: 400, opacity: 0.9 }}>
-                  💡 You can select <strong>multiple columns as Description</strong> and <strong>multiple columns as Amount</strong>. Amount columns can be inverted independently.
-                </p>
+                {isAutoDetected ? (
+                  <>
+                    <p style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: 500 }}>
+                      We detected your column layout automatically. Please review and adjust if needed.
+                    </p>
+                    <p style={{ margin: '0', fontSize: '13px', fontWeight: 400, opacity: 0.9 }}>
+                      Columns marked with a green dot were detected with high confidence. Orange dots indicate medium confidence -- double-check those.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: 500 }}>
+                      Match columns. Use the dropdowns to correspond columns from your file to the appropriate fields.
+                    </p>
+                    <p style={{ margin: '0', fontSize: '13px', fontWeight: 400, opacity: 0.9 }}>
+                      You can select <strong>multiple columns as Description</strong> and <strong>multiple columns as Amount</strong>. Amount columns can be inverted independently.
+                    </p>
+                  </>
+                )}
               </div>
 
               {/* Combined Scrollable Container for Dropdowns and Table */}
@@ -2673,6 +2718,15 @@ export const SimpleUpload: React.FC = () => {
                           { value: 'currency', label: 'Currency' },
                         ];
 
+                        const currentFieldType = columnMappings[i];
+                        const fieldConfidence = currentFieldType && currentFieldType !== 'do_not_use'
+                          ? detectionConfidence[currentFieldType] || null
+                          : null;
+                        const isDetected = isAutoDetected && currentFieldType && currentFieldType !== 'do_not_use';
+                        const confidenceColor = fieldConfidence === 'high' ? '#10b981'
+                          : fieldConfidence === 'medium' ? '#f59e0b'
+                          : fieldConfidence === 'low' ? '#ef4444' : null;
+
                         return (
                           <div key={i} style={{
                             minWidth: '180px',
@@ -2683,13 +2737,28 @@ export const SimpleUpload: React.FC = () => {
                             boxSizing: 'border-box',
                           }}>
                             <label style={{
-                              display: 'block',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '5px',
                               fontSize: '12px',
                               fontWeight: 600,
                               color: '#374151',
                               marginBottom: '4px',
                             }}>
                               {getColumnLetter(i)}
+                              {isDetected && confidenceColor && (
+                                <span
+                                  title={`${fieldConfidence} confidence`}
+                                  style={{
+                                    display: 'inline-block',
+                                    width: '7px',
+                                    height: '7px',
+                                    borderRadius: '50%',
+                                    backgroundColor: confidenceColor,
+                                    flexShrink: 0,
+                                  }}
+                                />
+                              )}
                             </label>
                             <select
                               value={columnMappings[i] || 'do_not_use'}
@@ -2713,7 +2782,9 @@ export const SimpleUpload: React.FC = () => {
                               style={{
                                 width: '100%',
                                 padding: '8px',
-                                border: '1px solid #d1d5db',
+                                border: isDetected && confidenceColor
+                                  ? `2px solid ${confidenceColor}`
+                                  : '1px solid #d1d5db',
                                 borderRadius: '6px',
                                 fontSize: '13px',
                                 backgroundColor: 'white',
@@ -2983,43 +3054,64 @@ export const SimpleUpload: React.FC = () => {
                 }}
               >
                 <div style={{ fontSize: '13px', fontWeight: 700, color: '#374151', marginBottom: '8px' }}>
-                  Net Flow Preview (respects include/exclude selections)
+                  Amount Verification
                 </div>
                 {isCalculatingMappingNetFlow && (
                   <div style={{ fontSize: '13px', color: '#6b7280' }}>
-                    Recalculating net flow...
+                    Verifying amounts...
                   </div>
                 )}
                 {!isCalculatingMappingNetFlow && mappingNetFlowError && (
-                  <div style={{ fontSize: '13px', color: '#b91c1c' }}>
+                  <div style={{
+                    padding: '10px',
+                    backgroundColor: '#fee2e2',
+                    border: '1px solid #fecaca',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    color: '#b91c1c',
+                  }}>
                     {mappingNetFlowError}
                   </div>
                 )}
                 {!isCalculatingMappingNetFlow && !mappingNetFlowError && mappingNetFlowPreview && (
-                  <div style={{ display: 'grid', gap: '6px' }}>
-                    <div style={{ fontSize: '18px', fontWeight: 700, color: mappingNetFlowPreview.net_flow < 0 ? '#dc2626' : '#16a34a' }}>
-                      {mappingNetFlowPreview.net_flow.toFixed(2)} {mappingNetFlowPreview.currency}
+                  <div style={{
+                    padding: '12px',
+                    backgroundColor: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    borderRadius: '8px',
+                  }}>
+                    <div style={{ fontSize: '20px', fontWeight: 700, color: mappingNetFlowPreview.net_flow < 0 ? '#dc2626' : '#16a34a', marginBottom: '8px' }}>
+                      Net: {mappingNetFlowPreview.net_flow.toFixed(2)} {mappingNetFlowPreview.currency}
                     </div>
-                    <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                      Included: {mappingNetFlowPreview.transaction_count} / Parsed: {mappingNetFlowPreview.parsed_transaction_count}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: '12px', color: '#374151' }}>
+                      <div>Inflows: <strong>{mappingNetFlowPreview.inflow_total.toFixed(2)}</strong></div>
+                      <div>Outflows: <strong>{mappingNetFlowPreview.outflow_total.toFixed(2)}</strong></div>
+                      <div>Transactions: <strong>{mappingNetFlowPreview.transaction_count}</strong></div>
+                      <div>Excluded: <strong>{mappingNetFlowPreview.excluded_transaction_count}</strong></div>
                     </div>
-                    <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                      Excluded: {mappingNetFlowPreview.excluded_transaction_count}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#9a3412' }}>
-                      Potentially excludable flagged: {mappingNetFlowPreview.suspicious_transaction_count}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                      Inflows: {mappingNetFlowPreview.inflow_total.toFixed(2)} {mappingNetFlowPreview.currency}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                      Outflows: {mappingNetFlowPreview.outflow_total.toFixed(2)} {mappingNetFlowPreview.currency}
-                    </div>
+                    {mappingNetFlowPreview.parsed_transaction_count > mappingNetFlowPreview.transaction_count + mappingNetFlowPreview.excluded_transaction_count && (
+                      <div style={{
+                        marginTop: '8px',
+                        padding: '6px 8px',
+                        backgroundColor: '#fef3c7',
+                        border: '1px solid #fde68a',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        color: '#92400e',
+                      }}>
+                        {mappingNetFlowPreview.parsed_transaction_count - mappingNetFlowPreview.transaction_count - mappingNetFlowPreview.excluded_transaction_count} row(s) failed to parse. Check your column mappings if totals look wrong.
+                      </div>
+                    )}
+                    {mappingNetFlowPreview.suspicious_transaction_count > 0 && (
+                      <div style={{ marginTop: '6px', fontSize: '11px', color: '#9a3412' }}>
+                        {mappingNetFlowPreview.suspicious_transaction_count} suspicious transaction(s) flagged
+                      </div>
+                    )}
                   </div>
                 )}
                 {!isCalculatingMappingNetFlow && !mappingNetFlowError && !mappingNetFlowPreview && (
                   <div style={{ fontSize: '12px', color: '#9ca3af' }}>
-                    Map Date, Description, and Amount/Inflow/Outflow to calculate live net flow.
+                    Map Date, Description, and Amount/Inflow/Outflow to verify totals.
                   </div>
                 )}
               </div>
@@ -3049,7 +3141,9 @@ export const SimpleUpload: React.FC = () => {
                       !Object.values(columnMappings).includes('inflow') &&
                       !Object.values(columnMappings).includes('outflow')) ||
                     !Object.values(columnMappings).includes('description') ||
-                    !firstTransactionRow
+                    !firstTransactionRow ||
+                    !mappingNetFlowPreview ||
+                    isCalculatingMappingNetFlow
                   }
                   style={{
                     flex: 1,
@@ -3060,7 +3154,9 @@ export const SimpleUpload: React.FC = () => {
                         Object.values(columnMappings).includes('inflow') ||
                         Object.values(columnMappings).includes('outflow')) &&
                       Object.values(columnMappings).includes('description') &&
-                      firstTransactionRow
+                      firstTransactionRow &&
+                      mappingNetFlowPreview &&
+                      !isCalculatingMappingNetFlow
                     ) ? '#dc2626' : '#9ca3af',
                     color: 'white',
                     border: 'none',
@@ -3073,11 +3169,15 @@ export const SimpleUpload: React.FC = () => {
                         Object.values(columnMappings).includes('inflow') ||
                         Object.values(columnMappings).includes('outflow')) &&
                       Object.values(columnMappings).includes('description') &&
-                      firstTransactionRow
+                      firstTransactionRow &&
+                      mappingNetFlowPreview &&
+                      !isCalculatingMappingNetFlow
                     ) ? 'pointer' : 'not-allowed',
                   }}
                 >
-                  Save & Process Statement
+                  {isCalculatingMappingNetFlow ? 'Verifying...'
+                    : isAutoDetected ? 'Looks Good \u2014 Process'
+                    : 'Save & Process Statement'}
                 </button>
               </div>
             </div>
