@@ -59,7 +59,12 @@ def parse_csv_statement(file_path: str, schema: Dict) -> List[Dict]:
         if file_path.endswith('.xlsx') or file_path.endswith('.xls'):
             df = pd.read_excel(file_path, header=None, skiprows=skip_rows)
         else:
-            df = pd.read_csv(file_path, header=None, skiprows=skip_rows, sep=delimiter)
+            from app.services.statement_analyzer import _expected_column_count
+            csv_kwargs: dict = dict(header=None, skiprows=skip_rows, sep=delimiter)
+            expected_cols = _expected_column_count(file_path, delimiter)
+            if expected_cols and expected_cols > 1:
+                csv_kwargs["names"] = list(range(expected_cols))
+            df = pd.read_csv(file_path, **csv_kwargs)
         
         logger.info("Parsed statement file", {
             "file_path": file_path,

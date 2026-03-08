@@ -35,15 +35,28 @@ _CURRENCY_STRIP_RE = re.compile(r'[$€£¥zł₹₽₩₪₺₴₿CHF\s]', re.I
 _CURRENCY_SYMBOLS: Dict[str, str] = {
     '$': 'USD', '€': 'EUR', '£': 'GBP', '¥': 'JPY', 'zł': 'PLN', '₹': 'INR',
     '₽': 'RUB', '₩': 'KRW', '₪': 'ILS', '₺': 'TRY', '₴': 'UAH', '₿': 'BTC',
-    'CHF': 'CHF',
+    'د.إ': 'AED', 'ر.س': 'SAR', 'ج.م': 'EGP', 'د.ك': 'KWD', 'ر.ع': 'OMR',
+    'د.ب': 'BHD', 'ر.ق': 'QAR', 'CHF': 'CHF',
 }
 
 _CURRENCY_CODES: List[str] = [
     'USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'CNY', 'HKD',
     'SGD', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'HUF', 'RON', 'BGN', 'HRK',
     'RUB', 'TRY', 'ZAR', 'BRL', 'MXN', 'INR', 'IDR', 'MYR', 'PHP', 'THB',
-    'KRW', 'TWD', 'ILS', 'AED', 'SAR', 'EGP', 'NGN',
+    'KRW', 'TWD', 'ILS', 'AED', 'SAR', 'EGP', 'NGN', 'KWD', 'OMR', 'BHD',
+    'QAR', 'JOD', 'LBP', 'MAD', 'TND', 'DZD',
 ]
+
+_IBAN_COUNTRY_TO_CURRENCY: Dict[str, str] = {
+    'DE': 'EUR', 'FR': 'EUR', 'IT': 'EUR', 'ES': 'EUR', 'NL': 'EUR', 'BE': 'EUR',
+    'AT': 'EUR', 'PT': 'EUR', 'FI': 'EUR', 'IE': 'EUR', 'LU': 'EUR', 'GR': 'EUR',
+    'SK': 'EUR', 'SI': 'EUR', 'EE': 'EUR', 'LV': 'EUR', 'LT': 'EUR', 'CY': 'EUR',
+    'MT': 'EUR', 'GB': 'GBP', 'CH': 'CHF', 'LI': 'CHF', 'SE': 'SEK', 'NO': 'NOK',
+    'DK': 'DKK', 'PL': 'PLN', 'CZ': 'CZK', 'HU': 'HUF', 'RO': 'RON', 'BG': 'BGN',
+    'HR': 'EUR', 'TR': 'TRY', 'IL': 'ILS', 'AE': 'AED', 'SA': 'SAR', 'EG': 'EGP',
+    'JO': 'JOD', 'KW': 'KWD', 'BH': 'BHD', 'QA': 'QAR', 'LB': 'LBP', 'TN': 'TND',
+    'MA': 'MAD', 'DZ': 'DZD',
+}
 
 
 def detect_delimiter(file_path: str) -> str:
@@ -79,6 +92,49 @@ def detect_delimiter(file_path: str) -> str:
     if candidates[best] == 0:
         return ","
     return best
+
+
+def _expected_column_count(file_path: str, delimiter: str) -> Optional[int]:
+    """Determine the correct column count for the actual data rows.
+
+    Files with metadata header rows (e.g. "Account Name:,John Doe") often have
+    fewer fields per line than the actual data rows.  Metadata rows are sparse;
+    data rows are dense.  We find the *maximum* column count that appears in at
+    least 2 non-empty lines — this reliably picks up the data-row width even
+    when metadata rows outnumber data rows.
+    """
+    try:
+        with open(file_path, "r", encoding="utf-8", errors="replace") as fh:
+            lines = []
+            for line in fh:
+                line = line.strip()
+                if line:
+                    lines.append(line)
+                if len(lines) >= 50:
+                    break
+    except Exception:
+        return None
+
+    if not lines:
+        return None
+
+    counts: Dict[int, int] = {}
+    for line in lines:
+        n = line.count(delimiter) + 1
+        counts[n] = counts.get(n, 0) + 1
+
+    # Pick the widest column count that appears at least twice (header + data).
+    # Fall back to the absolute max if nothing repeats.
+    candidates = sorted(counts.keys(), reverse=True)
+    for col_count in candidates:
+        if col_count > 1 and counts[col_count] >= 2:
+            return col_count
+
+    # Last resort: return the max if it's > 1
+    max_cols = max(counts.keys())
+    if max_cols <= 1:
+        return None
+    return max_cols
 
 
 def validate_column_reference(column_ref: Union[str, List[str]]) -> bool:
@@ -427,33 +483,50 @@ def _detect_currency(
     inflow_col: Optional[str],
     outflow_col: Optional[str],
 ) -> Tuple[str, str]:
-    """Detect currency from symbols in data and headers. Returns (code, confidence)."""
-    # Gather text to scan: amount columns + all header/first rows
+    """Detect currency from symbols, ISO codes, and IBAN country prefix.
+
+    Scans the ENTIRE dataframe — not just headers — because currency info can
+    appear in a dedicated column (e.g. German "Währung"), in amount cells
+    (e.g. "$1,234"), or in metadata rows anywhere in the file.
+
+    Falls back to IBAN country-prefix inference when no explicit code/symbol is
+    found.  Returns ``("USD", "low")`` only as a last resort.
+    """
     scan_texts: List[str] = []
 
-    # Scan all cells in first 2 rows (may contain header text like "Amount (EUR)")
-    for row_idx in range(min(2, len(df_raw))):
+    # Scan every cell in the dataframe (cap at 200 rows to stay fast on huge files)
+    max_rows = min(200, len(df_raw))
+    for row_idx in range(max_rows):
         for col_idx in range(len(df_raw.columns)):
-            scan_texts.append(str(df_raw.iloc[row_idx, col_idx]))
+            cell = str(df_raw.iloc[row_idx, col_idx]).strip()
+            if cell and cell.lower() != 'nan':
+                scan_texts.append(cell)
 
-    # Scan amount column values
+    # Also scan amount/inflow/outflow column values explicitly
     for col_ref in [amount_col, inflow_col, outflow_col]:
         if col_ref is not None:
             col_data = df_raw.iloc[:, int(col_ref)].astype(str).str.strip()
-            scan_texts.extend(col_data.head(10).tolist())
+            scan_texts.extend(col_data.tolist())
 
     combined = ' '.join(scan_texts)
 
-    # Check symbols
+    # 1) Check for currency symbols (highest confidence)
     for symbol, code in _CURRENCY_SYMBOLS.items():
         if symbol in combined:
             return (code, "high")
 
-    # Check ISO codes (word boundary)
+    # 2) Check for ISO currency codes as whole words
     combined_upper = combined.upper()
     for code in _CURRENCY_CODES:
         if re.search(r'\b' + code + r'\b', combined_upper):
             return (code, "medium")
+
+    # 3) Infer from IBAN country prefix (medium-low confidence)
+    iban_match = re.search(r'\b([A-Z]{2})\d{2}[\s]?\d', combined_upper)
+    if iban_match:
+        country = iban_match.group(1)
+        if country in _IBAN_COUNTRY_TO_CURRENCY:
+            return (_IBAN_COUNTRY_TO_CURRENCY[country], "medium")
 
     return ("USD", "low")
 
@@ -628,16 +701,17 @@ def analyze_statement_structure_from_file(file_path: str, user_id: str) -> Dict:
             df_raw = pd.read_excel(file_path, nrows=50, dtype=str, keep_default_na=False, header=None)
         else:
             delimiter = detect_delimiter(file_path)
+            expected_cols = _expected_column_count(file_path, delimiter)
+            csv_kwargs: Dict = dict(
+                nrows=50, dtype=str, keep_default_na=False, header=None, sep=delimiter,
+            )
+            if expected_cols and expected_cols > 1:
+                csv_kwargs["names"] = list(range(expected_cols))
             try:
-                df_raw = pd.read_csv(
-                    file_path, nrows=50, dtype=str, keep_default_na=False, header=None,
-                    sep=delimiter,
-                )
+                df_raw = pd.read_csv(file_path, **csv_kwargs)
             except pd.errors.ParserError:
-                df_raw = pd.read_csv(
-                    file_path, nrows=50, dtype=str, keep_default_na=False, header=None,
-                    on_bad_lines='skip', sep=delimiter,
-                )
+                csv_kwargs["on_bad_lines"] = "skip"
+                df_raw = pd.read_csv(file_path, **csv_kwargs)
 
         columns_found = [str(i) for i in range(len(df_raw.columns))]
         first_tx_row = _detect_first_transaction_row(df_raw)
