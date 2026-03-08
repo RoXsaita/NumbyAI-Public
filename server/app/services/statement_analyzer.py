@@ -30,7 +30,6 @@ _DATE_PATTERNS: List[Tuple[str, str]] = [
 
 _NUMERIC_RE = re.compile(r'^[+-]?\.?\d+\.?\d*$')
 _CURRENCY_STRIP_RE = re.compile(r'[$€£¥zł₹₽₩₪₺₴₿₦CHF\s]', re.IGNORECASE)
-_ISO_CURRENCY_RE = re.compile(r'\b[A-Z]{3}\b')
 _MULTI_CHAR_CURRENCY_RE = re.compile(r'R\$|د\.إ|ر\.س|ج\.م|د\.ك|ر\.ع|د\.ب|ر\.ق|د\.ا')
 
 _CURRENCY_SYMBOLS: Dict[str, str] = {
