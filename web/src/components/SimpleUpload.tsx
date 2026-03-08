@@ -2360,69 +2360,92 @@ export const SimpleUpload: React.FC = () => {
                   Bank Name *
                 </label>
                 {!showNewBankInput ? (
-                  <select
-                    value={bankName}
-                    onChange={(e) => {
-                      if (e.target.value === '__new__') {
-                        setShowNewBankInput(true);
-                      } else {
-                        setBankName(e.target.value);
-                      }
-                    }}
-                    disabled={isUploading}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      opacity: isUploading ? 0.6 : 1,
-                      cursor: isUploading ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    <option value="">Select bank...</option>
-                    {banks.map(bank => (
-                      <option key={bank} value={bank}>{bank}</option>
-                    ))}
-                    <option value="__new__">+ Add New Bank</option>
-                  </select>
-                ) : (
-                  <div>
-                    <input
-                      type="text"
-                      value={newBankName}
-                      onChange={(e) => setNewBankName(e.target.value)}
-                      placeholder="Enter bank name..."
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <select
+                      value={bankName}
+                      onChange={(e) => setBankName(e.target.value)}
                       disabled={isUploading}
                       style={{
-                        width: '100%',
+                        flex: 1,
                         padding: '12px',
                         border: '1px solid #d1d5db',
                         borderRadius: '8px',
                         fontSize: '14px',
-                        marginBottom: '8px',
                         opacity: isUploading ? 0.6 : 1,
-                      }}
-                    />
-                    <button
-                      onClick={() => {
-                        setShowNewBankInput(false);
-                        setNewBankName('');
-                      }}
-                      disabled={isUploading}
-                      style={{
-                        padding: '8px 16px',
-                        backgroundColor: '#e5e7eb',
-                        color: '#374151',
-                        border: 'none',
-                        borderRadius: '6px',
-                        fontSize: '14px',
                         cursor: isUploading ? 'not-allowed' : 'pointer',
-                        opacity: isUploading ? 0.6 : 1,
                       }}
                     >
-                      Cancel
+                      <option value="">Select bank...</option>
+                      {banks.map(bank => (
+                        <option key={bank} value={bank}>{bank}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => setShowNewBankInput(true)}
+                      disabled={isUploading}
+                      title="Add new bank"
+                      style={{
+                        flexShrink: 0,
+                        width: '44px',
+                        height: '44px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: '#f3f4f6',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '20px',
+                        color: '#374151',
+                        cursor: isUploading ? 'not-allowed' : 'pointer',
+                        opacity: isUploading ? 0.6 : 1,
+                        lineHeight: 1,
+                      }}
+                    >
+                      +
                     </button>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
+                      <input
+                        type="text"
+                        value={newBankName}
+                        onChange={(e) => setNewBankName(e.target.value)}
+                        placeholder="Enter bank name..."
+                        disabled={isUploading}
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') { setShowNewBankInput(false); setNewBankName(''); }
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '12px',
+                          border: '1px solid #6366f1',
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          opacity: isUploading ? 0.6 : 1,
+                          outline: 'none',
+                        }}
+                      />
+                      <button
+                        onClick={() => { setShowNewBankInput(false); setNewBankName(''); }}
+                        disabled={isUploading}
+                        style={{
+                          flexShrink: 0,
+                          padding: '8px 14px',
+                          backgroundColor: '#e5e7eb',
+                          color: '#374151',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          cursor: isUploading ? 'not-allowed' : 'pointer',
+                          opacity: isUploading ? 0.6 : 1,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -2442,71 +2465,92 @@ export const SimpleUpload: React.FC = () => {
                   Tag transactions to a person (e.g. "Me", "Partner", "Joint"). Optional.
                 </div>
                 {!showNewProfileInput ? (
-                  <select
-                    value={selectedProfile}
-                    onChange={(e) => {
-                      if (e.target.value === '__new__') {
-                        setShowNewProfileInput(true);
-                        setSelectedProfile('');
-                      } else {
-                        setSelectedProfile(e.target.value);
-                      }
-                    }}
-                    disabled={isUploading}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      opacity: isUploading ? 0.6 : 1,
-                      cursor: isUploading ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    <option value="">No profile (skip)</option>
-                    {profiles.map(p => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                    <option value="__new__">+ Add New Profile</option>
-                  </select>
-                ) : (
-                  <div>
-                    <input
-                      type="text"
-                      value={newProfileName}
-                      onChange={(e) => setNewProfileName(e.target.value)}
-                      placeholder="e.g. Me, Partner, Joint..."
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <select
+                      value={selectedProfile}
+                      onChange={(e) => setSelectedProfile(e.target.value)}
                       disabled={isUploading}
-                      autoFocus
                       style={{
-                        width: '100%',
+                        flex: 1,
                         padding: '12px',
                         border: '1px solid #d1d5db',
                         borderRadius: '8px',
                         fontSize: '14px',
-                        marginBottom: '8px',
                         opacity: isUploading ? 0.6 : 1,
-                      }}
-                    />
-                    <button
-                      onClick={() => {
-                        setShowNewProfileInput(false);
-                        setNewProfileName('');
-                      }}
-                      disabled={isUploading}
-                      style={{
-                        padding: '8px 16px',
-                        backgroundColor: '#e5e7eb',
-                        color: '#374151',
-                        border: 'none',
-                        borderRadius: '6px',
-                        fontSize: '14px',
                         cursor: isUploading ? 'not-allowed' : 'pointer',
-                        opacity: isUploading ? 0.6 : 1,
                       }}
                     >
-                      Cancel
+                      <option value="">No profile (skip)</option>
+                      {profiles.map(p => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => { setShowNewProfileInput(true); setSelectedProfile(''); }}
+                      disabled={isUploading}
+                      title="Add new profile"
+                      style={{
+                        flexShrink: 0,
+                        width: '44px',
+                        height: '44px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: '#f3f4f6',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '20px',
+                        color: '#374151',
+                        cursor: isUploading ? 'not-allowed' : 'pointer',
+                        opacity: isUploading ? 0.6 : 1,
+                        lineHeight: 1,
+                      }}
+                    >
+                      +
                     </button>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        value={newProfileName}
+                        onChange={(e) => setNewProfileName(e.target.value)}
+                        placeholder="e.g. Me, Partner, Joint..."
+                        disabled={isUploading}
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') { setShowNewProfileInput(false); setNewProfileName(''); }
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '12px',
+                          border: '1px solid #6366f1',
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          opacity: isUploading ? 0.6 : 1,
+                          outline: 'none',
+                        }}
+                      />
+                      <button
+                        onClick={() => { setShowNewProfileInput(false); setNewProfileName(''); }}
+                        disabled={isUploading}
+                        style={{
+                          flexShrink: 0,
+                          padding: '8px 14px',
+                          backgroundColor: '#e5e7eb',
+                          color: '#374151',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          cursor: isUploading ? 'not-allowed' : 'pointer',
+                          opacity: isUploading ? 0.6 : 1,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
