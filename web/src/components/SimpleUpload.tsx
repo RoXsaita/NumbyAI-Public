@@ -126,6 +126,10 @@ export const SimpleUpload: React.FC = () => {
       amount: number;
       reasons: Array<{ code: string; label: string }>;
     }>;
+    converted_net_flow?: number;
+    converted_inflow_total?: number;
+    converted_outflow_total?: number;
+    functional_currency?: string;
   } | null>(null);
   const [excludedTransactionRows, setExcludedTransactionRows] = useState<number[]>([]);
   const [isCalculatingMappingNetFlow, setIsCalculatingMappingNetFlow] = useState(false);
@@ -3083,9 +3087,23 @@ export const SimpleUpload: React.FC = () => {
                     <div style={{ fontSize: '20px', fontWeight: 700, color: mappingNetFlowPreview.net_flow < 0 ? '#dc2626' : '#16a34a', marginBottom: '8px' }}>
                       Net: {mappingNetFlowPreview.net_flow.toFixed(2)} {mappingNetFlowPreview.currency}
                     </div>
+                    {mappingNetFlowPreview.functional_currency && mappingNetFlowPreview.converted_net_flow != null && (
+                      <div style={{
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        color: mappingNetFlowPreview.converted_net_flow < 0 ? '#dc2626' : '#16a34a',
+                        marginBottom: '8px',
+                        padding: '4px 8px',
+                        backgroundColor: '#eff6ff',
+                        borderRadius: '4px',
+                        border: '1px solid #bfdbfe',
+                      }}>
+                        Converted: {mappingNetFlowPreview.converted_net_flow.toFixed(2)} {mappingNetFlowPreview.functional_currency}
+                      </div>
+                    )}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: '12px', color: '#374151' }}>
-                      <div>Inflows: <strong>{mappingNetFlowPreview.inflow_total.toFixed(2)}</strong></div>
-                      <div>Outflows: <strong>{mappingNetFlowPreview.outflow_total.toFixed(2)}</strong></div>
+                      <div>Inflows: <strong>{mappingNetFlowPreview.inflow_total.toFixed(2)}</strong>{mappingNetFlowPreview.converted_inflow_total != null && mappingNetFlowPreview.functional_currency ? <span style={{ color: '#6b7280' }}>{' '}({mappingNetFlowPreview.converted_inflow_total.toFixed(2)} {mappingNetFlowPreview.functional_currency})</span> : null}</div>
+                      <div>Outflows: <strong>{mappingNetFlowPreview.outflow_total.toFixed(2)}</strong>{mappingNetFlowPreview.converted_outflow_total != null && mappingNetFlowPreview.functional_currency ? <span style={{ color: '#6b7280' }}>{' '}({mappingNetFlowPreview.converted_outflow_total.toFixed(2)} {mappingNetFlowPreview.functional_currency})</span> : null}</div>
                       <div>Transactions: <strong>{mappingNetFlowPreview.transaction_count}</strong></div>
                       <div>Excluded: <strong>{mappingNetFlowPreview.excluded_transaction_count}</strong></div>
                     </div>
@@ -3105,6 +3123,20 @@ export const SimpleUpload: React.FC = () => {
                     {mappingNetFlowPreview.suspicious_transaction_count > 0 && (
                       <div style={{ marginTop: '6px', fontSize: '11px', color: '#9a3412' }}>
                         {mappingNetFlowPreview.suspicious_transaction_count} suspicious transaction(s) flagged
+                      </div>
+                    )}
+                    {!uploadResult?.parsing_preferences_exist && (
+                      <div style={{
+                        marginTop: '10px',
+                        padding: '8px 10px',
+                        backgroundColor: '#fffbeb',
+                        border: '1px solid #fde68a',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        color: '#92400e',
+                        lineHeight: 1.4,
+                      }}>
+                        First time with this bank? We recommend cross-checking these totals against your bank&apos;s PDF statement or online portal to confirm everything imported correctly.
                       </div>
                     )}
                   </div>

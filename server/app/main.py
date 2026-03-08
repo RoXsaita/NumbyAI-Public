@@ -44,6 +44,10 @@ from app.services.categorization_rules import (
     apply_categorization_rules,
     normalize_rule_input,
 )
+from app.services.currency_service import (
+    convert_amount,
+    prefetch_rates_for_months,
+)
 from app.services.statement_analyzer import (
     check_existing_parsing_preferences,
     analyze_statement_structure_from_file,
@@ -225,6 +229,8 @@ def _build_transaction_payloads(
     bank_name: Optional[str],
     user_id: str,
     profile: Optional[str] = None,
+    functional_currency: Optional[str] = None,
+    rate_lookup: Optional[Dict[str, Optional[Decimal]]] = None,
 ) -> List[Dict[str, Any]]:
     default_currency = (schema or {}).get("currency", "USD")
     transaction_payloads: List[Dict[str, Any]] = []
@@ -239,6 +245,27 @@ def _build_transaction_payloads(
         if not isinstance(amount_value, Decimal):
             amount_value = Decimal(str(amount_value))
 
+        tx_currency = tx.get("currency", default_currency)
+
+        original_amount = None
+        original_currency = None
+        exchange_rate = None
+
+        needs_conversion = (
+            functional_currency
+            and rate_lookup
+            and tx_currency != functional_currency
+        )
+        if needs_conversion:
+            month_key = tx_date.strftime("%Y-%m") if isinstance(tx_date, date) else None
+            rate = rate_lookup.get(month_key) if month_key else None
+            if rate is not None:
+                original_amount = amount_value
+                original_currency = tx_currency
+                exchange_rate = rate
+                amount_value = convert_amount(amount_value, rate)
+                tx_currency = functional_currency
+
         review_info = review_map.get(tx_id, {})
         transaction_payloads.append({
             "user_id": user_id,
@@ -246,7 +273,10 @@ def _build_transaction_payloads(
             "description": tx["description"],
             "merchant": tx.get("merchant"),
             "amount": amount_value,
-            "currency": tx.get("currency", default_currency),
+            "currency": tx_currency,
+            "original_amount": original_amount,
+            "original_currency": original_currency,
+            "exchange_rate": exchange_rate,
             "category": category_map.get(tx_id, MANUAL_REVIEW),
             "category_source": category_source_map.get(tx_id, "ai"),
             "bank_name": bank_name or "Unknown",
@@ -265,7 +295,7 @@ def _build_preview_transactions(
 ) -> List[Dict[str, Any]]:
     preview_txs: List[Dict[str, Any]] = []
     for tx, payload in zip(normalized_txs, transaction_payloads):
-        preview_txs.append({
+        entry = {
             **tx,
             "date": payload["date"],
             "amount": payload["amount"],
@@ -277,7 +307,12 @@ def _build_preview_transactions(
             "review_status": payload["review_status"],
             "review_category": payload["review_category"],
             "review_reason": payload["review_reason"],
-        })
+        }
+        if payload.get("original_currency"):
+            entry["original_amount"] = payload["original_amount"]
+            entry["original_currency"] = payload["original_currency"]
+            entry["exchange_rate"] = payload["exchange_rate"]
+        preview_txs.append(entry)
     return preview_txs
 
 
@@ -332,14 +367,18 @@ def _read_csv_preview(
 ) -> tuple[list[list[str]], int, int]:
     """Read full statement data for mapping UI (preview_data, total_rows, total_columns)."""
     import pandas as pd
+    from app.services.statement_analyzer import _expected_column_count
 
     if file_path.suffix.lower() in {".xlsx", ".xls"}:
         df_full = pd.read_excel(str(file_path), dtype=str, keep_default_na=False, header=None)
     else:
-        df_full = pd.read_csv(
-            str(file_path), dtype=str, keep_default_na=False, header=None,
-            sep=delimiter,
-        )
+        csv_kwargs: dict = dict(dtype=str, keep_default_na=False, header=None, sep=delimiter)
+        expected_cols = _expected_column_count(str(file_path), delimiter)
+        if expected_cols and expected_cols > 1:
+            csv_kwargs["names"] = list(range(expected_cols))
+        df_full = pd.read_csv(str(file_path), **csv_kwargs)
+
+    df_full = df_full.fillna("")
     preview_data: list[list[str]] = df_full.values.tolist()
     total_rows = len(df_full)
     total_columns = len(df_full.columns) if total_rows > 0 else 0
@@ -650,7 +689,10 @@ async def preview_statement_net_flow(request: Request) -> JSONResponse:
         inflow_total = sum((amount for amount in amounts if amount > 0), Decimal("0"))
         outflow_total = sum((abs(amount) for amount in amounts if amount < 0), Decimal("0"))
 
-        return JSONResponse({
+        statement_currency = schema.get("currency", "USD")
+        functional_currency = _resolve_user_currency(user_id)
+
+        response_data: Dict[str, Any] = {
             "transaction_count": len(included_txs),
             "parsed_transaction_count": len(normalized_txs),
             "excluded_transaction_count": len(normalized_txs) - len(included_txs),
@@ -658,12 +700,60 @@ async def preview_statement_net_flow(request: Request) -> JSONResponse:
             "net_flow": float(net_flow),
             "inflow_total": float(inflow_total),
             "outflow_total": float(outflow_total),
-            "currency": schema.get("currency", "USD"),
+            "currency": statement_currency,
             "first_transaction_row": schema.get("first_transaction_row", 1),
             "invert_amount_sign": bool(schema.get("invert_amount_sign", False)),
             "suspicious_transaction_count": len(suspicious_transactions),
             "suspicious_transactions": suspicious_transactions,
-        })
+        }
+
+        if functional_currency and statement_currency != functional_currency:
+            tx_dates = []
+            for tx in included_txs:
+                d = tx.get("date")
+                if isinstance(d, str):
+                    try:
+                        d = datetime.fromisoformat(d).date()
+                    except ValueError:
+                        continue
+                if isinstance(d, date):
+                    tx_dates.append(d)
+            if tx_dates:
+                months = sorted({d.strftime("%Y-%m") for d in tx_dates})
+                rate_lookup = prefetch_rates_for_months(
+                    months, statement_currency, functional_currency,
+                )
+                converted_amounts: List[Decimal] = []
+                for tx in included_txs:
+                    d = tx.get("date")
+                    if isinstance(d, str):
+                        try:
+                            d = datetime.fromisoformat(d).date()
+                        except ValueError:
+                            d = None
+                    month_key = d.strftime("%Y-%m") if isinstance(d, date) else None
+                    rate = rate_lookup.get(month_key) if month_key else None
+                    amt = tx.get("amount")
+                    if not isinstance(amt, Decimal):
+                        amt = Decimal(str(amt))
+                    if rate is not None:
+                        converted_amounts.append(convert_amount(amt, rate))
+                    else:
+                        converted_amounts.append(amt)
+
+                converted_net = sum(converted_amounts, Decimal("0"))
+                converted_inflow = sum(
+                    (a for a in converted_amounts if a > 0), Decimal("0"),
+                )
+                converted_outflow = sum(
+                    (abs(a) for a in converted_amounts if a < 0), Decimal("0"),
+                )
+                response_data["converted_net_flow"] = float(converted_net)
+                response_data["converted_inflow_total"] = float(converted_inflow)
+                response_data["converted_outflow_total"] = float(converted_outflow)
+                response_data["functional_currency"] = functional_currency
+
+        return JSONResponse(response_data)
 
     except HTTPException as e:
         return JSONResponse({"error": e.detail}, status_code=e.status_code)
@@ -701,7 +791,7 @@ def _build_schema_from_header_mapping(
     user_id: str,
     bank_name: Optional[str] = None,
 ) -> Dict[str, Any]:
-    currency = _resolve_user_currency(user_id)
+    statement_currency = mapping_data.get("currency") or _resolve_user_currency(user_id)
 
     column_mappings = mapping_data.get("column_mappings", {})
     if not column_mappings:
@@ -721,7 +811,7 @@ def _build_schema_from_header_mapping(
     schema: Dict[str, Any] = {
         "column_mappings": column_mappings,
         "date_format": mapping_data.get("date_format", "DD/MM/YYYY"),
-        "currency": currency,
+        "currency": statement_currency,
         "number_format": mapping_data.get("number_format", "auto"),
         "delimiter": mapping_data.get("delimiter", ","),
         "has_headers": False,
@@ -1153,12 +1243,35 @@ async def process_statement_pipeline(
             parsed_dates.append(d)
 
     date_range = None
+    statement_months: List[str] = []
     if parsed_dates:
+        statement_months = sorted({d.strftime("%Y-%m") for d in parsed_dates})
         date_range = {
             "min": min(parsed_dates).isoformat(),
             "max": max(parsed_dates).isoformat(),
-            "months": sorted({d.strftime("%Y-%m") for d in parsed_dates}),
+            "months": statement_months,
         }
+
+    functional_currency = _resolve_user_currency(user_id)
+    statement_currency = (schema or {}).get("currency", "USD")
+    rate_lookup: Optional[Dict[str, Optional[Decimal]]] = None
+    if functional_currency and statement_currency != functional_currency and statement_months:
+        logger.info("Currency conversion required", {
+            "statement_currency": statement_currency,
+            "functional_currency": functional_currency,
+            "months": statement_months,
+        })
+        rate_lookup = prefetch_rates_for_months(
+            statement_months, statement_currency, functional_currency,
+        )
+        emit_progress({
+            "type": "stage",
+            "name": "currency_rates_fetched",
+            "from_currency": statement_currency,
+            "to_currency": functional_currency,
+            "months": statement_months,
+            "rates_found": sum(1 for r in rate_lookup.values() if r is not None),
+        })
 
     emit_progress({
         "type": "stage",
@@ -1363,6 +1476,8 @@ async def process_statement_pipeline(
         bank_name=bank_name,
         user_id=user_id,
         profile=profile,
+        functional_currency=functional_currency if rate_lookup else None,
+        rate_lookup=rate_lookup,
     )
 
     # --- Dry-run mode: return preview without saving ---

@@ -21,6 +21,9 @@ export interface Transaction {
   category_source?: 'rule' | 'ai' | 'manual' | null;
   bank_name: string;
   profile: string | null;
+  original_amount?: number | null;
+  original_currency?: string | null;
+  exchange_rate?: number | null;
 }
 
 export interface TransactionFilters {
