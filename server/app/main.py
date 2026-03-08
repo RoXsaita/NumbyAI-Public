@@ -386,7 +386,9 @@ def _read_csv_preview(
     if file_path.suffix.lower() in {".xlsx", ".xls"}:
         df_full = pd.read_excel(str(file_path), dtype=str, keep_default_na=False, header=None)
     else:
-        csv_kwargs: dict = dict(dtype=str, keep_default_na=False, header=None, sep=delimiter)
+        from app.services.statement_analyzer import detect_csv_encoding
+        encoding = detect_csv_encoding(str(file_path))
+        csv_kwargs: dict = dict(dtype=str, keep_default_na=False, header=None, sep=delimiter, encoding=encoding)
         expected_cols = _expected_column_count(str(file_path), delimiter)
         if expected_cols and expected_cols > 1:
             csv_kwargs["names"] = list(range(expected_cols))

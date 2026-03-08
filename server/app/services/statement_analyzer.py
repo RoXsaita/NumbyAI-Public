@@ -57,6 +57,23 @@ _IBAN_COUNTRY_TO_CURRENCY: Dict[str, str] = {
     'MA': 'MAD', 'DZ': 'DZD',
 }
 
+# Encodings to try in order when reading CSV files.
+# Covers UTF-8 (with/without BOM), Windows-1250 (Polish/Central European bank exports),
+# ISO-8859-2 (Latin-2), and ISO-8859-1 (Latin-1 / Western European) as a last resort.
+_CSV_ENCODING_FALLBACKS = ['utf-8-sig', 'utf-8', 'cp1250', 'iso-8859-2', 'iso-8859-1']
+
+
+def detect_csv_encoding(file_path: str) -> str:
+    """Detect the character encoding of a CSV file by trying common encodings in order."""
+    for enc in _CSV_ENCODING_FALLBACKS:
+        try:
+            with open(file_path, 'r', encoding=enc) as fh:
+                fh.read(16384)
+            return enc
+        except (UnicodeDecodeError, LookupError):
+            continue
+    return 'utf-8'
+
 
 def detect_delimiter(file_path: str) -> str:
     """Auto-detect the CSV field delimiter using csv.Sniffer with a counting fallback.
@@ -64,7 +81,8 @@ def detect_delimiter(file_path: str) -> str:
     Reads up to 8 KB from the file.  Returns one of ``","`` ``";"`` ``"\\t"`` ``"|"``.
     """
     try:
-        with open(file_path, "r", encoding="utf-8", errors="replace") as fh:
+        enc = detect_csv_encoding(file_path)
+        with open(file_path, "r", encoding=enc, errors="replace") as fh:
             sample = fh.read(8192)
     except Exception:
         return ","
@@ -103,7 +121,8 @@ def _expected_column_count(file_path: str, delimiter: str) -> Optional[int]:
     when metadata rows outnumber data rows.
     """
     try:
-        with open(file_path, "r", encoding="utf-8", errors="replace") as fh:
+        enc = detect_csv_encoding(file_path)
+        with open(file_path, "r", encoding=enc, errors="replace") as fh:
             lines = []
             for line in fh:
                 line = line.strip()
@@ -700,9 +719,11 @@ def analyze_statement_structure_from_file(file_path: str, user_id: str) -> Dict:
             df_raw = pd.read_excel(file_path, nrows=50, dtype=str, keep_default_na=False, header=None)
         else:
             delimiter = detect_delimiter(file_path)
+            encoding = detect_csv_encoding(file_path)
             expected_cols = _expected_column_count(file_path, delimiter)
             csv_kwargs: Dict = dict(
                 nrows=50, dtype=str, keep_default_na=False, header=None, sep=delimiter,
+                encoding=encoding,
             )
             if expected_cols and expected_cols > 1:
                 csv_kwargs["names"] = list(range(expected_cols))
