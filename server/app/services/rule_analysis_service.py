@@ -402,7 +402,7 @@ def _validate_findings_with_llm(
     try:
         parsed = call_llm_json_array(prompt, response_schema)
     except Exception as exc:
-        logger.warn("Rule analysis LLM validation failed; keeping deterministic findings", {"error": str(exc)})
+        logger.warning("Rule analysis LLM validation failed; keeping deterministic findings", {"error": str(exc)})
         return None
 
     by_candidate = {item["candidate_id"]: item for item in candidates}
@@ -613,7 +613,7 @@ def _suggest_rules_for_singletons(
     try:
         parsed = call_llm_json_array(prompt, response_schema)
     except Exception as exc:
-        logger.warn("Uncovered singleton LLM suggestion failed", {"error": str(exc)})
+        logger.warning("Uncovered singleton LLM suggestion failed", {"error": str(exc)})
         return
 
     tx_by_id = {str(tx.id): tx for tx in singletons}

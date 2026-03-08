@@ -3139,6 +3139,7 @@ async def get_categories(request: Request) -> JSONResponse:
                 .order_by(CustomCategory.name)
                 .all()
             )
+            custom_names = [row.name for row in custom_rows]
             custom = [
                 {"id": str(row.id), "name": row.name, "is_custom": True}
                 for row in custom_rows
@@ -3150,7 +3151,7 @@ async def get_categories(request: Request) -> JSONResponse:
             for cat in PREDEFINED_CATEGORIES
         ]
         return JSONResponse({
-            "categories": PREDEFINED_CATEGORIES + [row.name for row in custom_rows],
+            "categories": PREDEFINED_CATEGORIES + custom_names,
             "categories_detail": predefined + custom,
         })
     except Exception as e:
