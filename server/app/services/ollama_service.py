@@ -20,7 +20,6 @@ logger = create_logger("ollama_service")
 
 _DEFAULT_NUM_CTX = 32768
 _CONTEXT_BUDGET_RATIO = 0.55
-_OUTPUT_TOKENS_PER_TX = 30
 
 
 # ---------------------------------------------------------------------------

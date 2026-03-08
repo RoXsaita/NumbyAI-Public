@@ -504,9 +504,13 @@ def _parse_amount(amount_str: str, number_format: str = "auto") -> Decimal:
     - Swiss:    1'234.56  -> 1234.56
     - Plain:    -104.77   -> -104.77
     """
-    amount_str = re.sub(r"[$€£¥zł₹₽₩₪₺₴₿]", '', amount_str, flags=re.IGNORECASE)
-    # Strip ISO currency codes (e.g. "PLN", "USD", "EUR") — common in Polish/European bank exports
-    amount_str = re.sub(r'\b[A-Z]{3}\b', '', amount_str)
+    # Strip multi-char currency prefixes (R$, د.إ, etc.)
+    amount_str = re.sub(r'R\$|د\.إ|ر\.س|ج\.م|د\.ك|ر\.ع|د\.ب|ر\.ق|د\.ا', '', amount_str)
+    amount_str = re.sub(r"[$€£¥zł₹₽₩₪₺₴₿₦]", '', amount_str, flags=re.IGNORECASE)
+    # Strip ISO currency codes (e.g. "PLN", "USD", "EUR") — common in Polish/European bank exports.
+    # Use letter-boundary lookaround instead of \b so codes directly adjacent to digits are caught
+    # (e.g. "1234.56PLN" — \b has no boundary between digit '6' and letter 'P').
+    amount_str = re.sub(r'(?<![A-Za-z])[A-Z]{3}(?![A-Za-z])', '', amount_str)
     amount_str = amount_str.replace('\xa0', '').replace(' ', '').replace("'", '')
 
     if amount_str.startswith('(') and amount_str.endswith(')'):
