@@ -1,0 +1,30 @@
+services:
+  app:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./web/dist:/app/web/dist:ro
+      - sqlite_data:/app/data
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///./data/finance_recon.db}
+      - SECRET_KEY=${SECRET_KEY:-dev-only-not-for-production}
+      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen3.5:9b}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+    depends_on:
+      ollama:
+        condition: service_started
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+volumes:
+  sqlite_data:
+  ollama_data:
