@@ -1,0 +1,16 @@
+Dubai Islamic Bank - Account Statement
+Account,AE590240012345678901234
+Period,01/01/2026 - 31/01/2026
+,,,,,
+
+Date,Description,Debit,Credit,Balance
+02/01/2026,Salary Transfer - ADNOC,,"AED 25,000.00","AED 85,230.75"
+03/01/2026,Rent - Al Reem Island,"AED 6,500.00",,"AED 78,730.75"
+04/01/2026,ADDC Electricity,"AED 485.30",,"AED 78,245.45"
+05/01/2026,Lulu Hypermarket,"AED 312.50",,"AED 77,932.95"
+06/01/2026,Etisalat Monthly,"AED 299.00",,"AED 77,633.95"
+07/01/2026,Transfer from Ali,,"AED 3,000.00","AED 80,633.95"
+08/01/2026,Life Pharmacy,"AED 187.65",,"AED 80,446.30"
+10/01/2026,RTA Salik,"AED 100.00",,"AED 80,346.30"
+12/01/2026,Oman Insurance,"AED 1,250.00",,"AED 79,096.30"
+15/01/2026,ATM Withdrawal,"AED 2,000.00",,"AED 77,096.30"

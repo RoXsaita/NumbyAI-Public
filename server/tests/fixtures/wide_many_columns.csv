@@ -1,0 +1,16 @@
+Bank of Commerce - Detailed Transaction Report
+Account: 9876543210
+Period: 01/01/2026 - 31/01/2026
+,,,,,,,,,,,,,,,
+
+Seq,Date,Value Date,Time,Branch,Channel,Transaction Type,Reference,Description,Merchant Category,Debit,Credit,Fee,Tax,Running Balance,Remarks
+1,01/02/2026,01/02/2026,08:00:00,Main,ACH,Salary,SAL-001,PAYROLL - TECHCORP INC,Income,,3250.00,0.00,0.00,8420.50,Monthly salary
+2,01/02/2026,01/02/2026,10:30:00,Main,EFT,Rent,CHK-001,RENT PAYMENT - 123 OAK ST,Housing,1200.00,,0.00,0.00,7220.50,January rent
+3,01/03/2026,01/03/2026,14:15:00,Online,WEB,Utility,UTL-001,ELECTRIC COMPANY PAYMENT,Utilities,94.30,,0.00,0.00,7126.20,Electric bill
+4,01/05/2026,01/05/2026,09:45:00,ATM,POS,Purchase,POS-001,SAFEWAY STORE #4521,Groceries,87.43,,0.00,0.00,7038.77,Grocery shopping
+5,01/06/2026,01/06/2026,23:59:00,Online,REC,Subscription,SUB-001,DISNEY+ SUBSCRIPTION,Entertainment,15.99,,0.00,0.00,7022.78,Monthly sub
+6,01/07/2026,01/07/2026,11:00:00,Main,ACH,Transfer,TRF-001,TRANSFER FROM SPOUSE,Transfer,,500.00,0.00,0.00,7522.78,Family transfer
+7,01/08/2026,01/08/2026,16:20:00,Branch,POS,Purchase,POS-002,BP GAS STATION,Transportation,45.00,,1.50,0.00,7476.28,Fuel
+8,01/10/2026,01/10/2026,00:00:00,Online,WEB,Utility,UTL-002,XFINITY INTERNET,Utilities,85.00,,0.00,0.00,7391.28,Internet bill
+9,01/12/2026,01/12/2026,12:30:00,ATM,POS,Purchase,POS-003,OLIVE GARDEN #789,Food,62.40,,0.00,0.00,7328.88,Dining out
+10,01/15/2026,01/15/2026,00:00:00,Online,REC,Insurance,INS-001,STATE FARM PREMIUM,Insurance,189.00,,0.00,0.00,7139.88,Auto insurance

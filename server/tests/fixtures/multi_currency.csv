@@ -1,0 +1,16 @@
+International Trading Account
+Account: XXXX-5678
+Period: 01/01/2026 - 31/01/2026
+,,,,,,
+
+Date,Description,Currency,Debit,Credit,Balance,Balance Currency
+01/02/2026,Salary Wire Transfer,USD,,"25,000.00","125,000.50",USD
+01/03/2026,EUR Wire - Apartment Berlin,EUR,"3,500.00",,"121,500.50",USD
+01/04/2026,GBP Payment - London Office,GBP,"2,100.00",,"119,400.50",USD
+01/05/2026,JPY Transfer - Tokyo Supplier,JPY,"500,000",,"118,900.50",USD
+01/06/2026,CHF Insurance Premium,CHF,"450.00",,"118,450.50",USD
+01/07/2026,GBP Received - Client Payment,GBP,,"5,000.00","123,450.50",USD
+01/08/2026,AED Hotel Dubai,AED,"1,200.00",,"122,250.50",USD
+01/10/2026,EUR Received - Consulting Fee,EUR,,"8,000.00","130,250.50",USD
+01/12/2026,BRL Transfer - São Paulo,BRL,"15,000.00",,"115,250.50",USD
+01/15/2026,SGD Payment - Singapore,SGD,"3,200.00",,"112,050.50",USD

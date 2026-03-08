@@ -1,0 +1,31 @@
+╔══════════════════════════════════════╗
+║  FIRST CITIZENS BANK & TRUST CO.    ║
+║  Monthly Statement of Account       ║
+╚══════════════════════════════════════╝
+Confidential - For Addressee Only
+Customer ID: C-2026-00987
+Full Name: Jane Doe-Smith
+Address: 1234 Oak Avenue
+City/State: Raleigh NC 27601
+Phone: (919) 555-0123
+Account Number: 123-456-7890
+Account Type: Premium Checking
+Routing Number: 053100300
+Statement Number: 2026-01
+Statement Period: 01/01/2026 through 01/31/2026
+Opening Balance: $5,230.45
+Closing Balance: $6,822.03
+Total Debits: $1,658.45
+Total Credits: $3,250.00
+,,,,
+Date,Description,Reference,Debit,Credit,Balance
+01/02/2026,DIRECT DEPOSIT - EMPLOYER,DD-001,,"3,250.00","8,480.45"
+01/02/2026,ONLINE BILL PAY - RENT,BP-001,"1,200.00",,"7,280.45"
+01/03/2026,ACH - DUKE ENERGY,ACH-001,"94.30",,"7,186.15"
+01/05/2026,DEBIT POS - HARRIS TEETER,POS-001,"87.43",,"7,098.72"
+01/06/2026,ACH - HULU SUBSCRIPTION,ACH-002,"15.99",,"7,082.73"
+01/07/2026,MOBILE DEPOSIT - CHECK,DEP-001,,"150.00","7,232.73"
+01/08/2026,DEBIT POS - SHEETZ #123,POS-002,"52.00",,"7,180.73"
+01/10/2026,ACH - SPECTRUM INTERNET,ACH-003,"85.00",,"7,095.73"
+01/12/2026,DEBIT POS - PANERA BREAD,POS-003,"24.75",,"7,070.98"
+01/15/2026,ACH - NATIONWIDE INS,ACH-004,"189.00",,"6,881.98"

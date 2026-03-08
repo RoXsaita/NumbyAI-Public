@@ -1,0 +1,17 @@
+GTBank Nigeria - Account Statement
+Account Number,0123456789
+Branch,Victoria Island Lagos
+Period,01/01/2026 - 31/01/2026
+Currency,NGN
+,,,,,,
+Date,Description,Reference,Debit (₦),Credit (₦),Balance (₦)
+02/01/2026,Salary - DANGOTE INDUSTRIES LTD,NIP/001,,"1,250,000.00","3,450,230.50"
+03/01/2026,Rent Payment - LEKKI ESTATES,TRF/002,"350,000.00",,"3,100,230.50"
+04/01/2026,PHCN Electricity Bill,BPY/003,"45,000.00",,"3,055,230.50"
+05/01/2026,Shoprite Supermarket Victoria Island,POS/004,"78,500.00",,"2,976,730.50"
+06/01/2026,MTN Nigeria - Airtime/Data,DDR/005,"15,000.00",,"2,961,730.50"
+07/01/2026,Transfer from Emeka Okafor,NIP/006,,"200,000.00","3,161,730.50"
+08/01/2026,Medplus Pharmacy Lekki,POS/007,"12,350.00",,"3,149,380.50"
+10/01/2026,Bolt Ride,POS/008,"4,500.00",,"3,144,880.50"
+12/01/2026,AIICO Insurance Premium,DDR/009,"85,000.00",,"3,059,880.50"
+15/01/2026,ATM Withdrawal - VI Branch,ATM/010,"100,000.00",,"2,959,880.50"

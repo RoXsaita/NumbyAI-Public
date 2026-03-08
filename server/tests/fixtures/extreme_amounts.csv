@@ -1,0 +1,17 @@
+Wealth Management Statement
+Account: XXXX9999
+Period: January 2026
+Currency: USD
+,,,,,
+
+Date,Description,Reference,Amount,Balance
+01/02/2026,Wire Transfer - Salary,WT-001,"1,250,000.00","5,432,100.50"
+01/02/2026,Mortgage Payment,ACH-001,"-85,000.00","5,347,100.50"
+01/03/2026,Micro-transaction Fee,FEE-001,-0.01,"5,347,100.49"
+01/04/2026,Zero-amount Adjustment,ADJ-001,0.00,"5,347,100.49"
+01/05/2026,ATM Withdrawal,ATM-001,-0.50,"5,347,099.99"
+01/06/2026,Foreign Exchange Fee,FEE-002,-0.001,"5,347,099.99"
+01/07/2026,Investment Return,INV-001,"99,999.99","5,447,099.98"
+01/08/2026,Charity Donation,CHK-001,"-50,000.00","5,397,099.98"
+01/10/2026,Interest Credit,INT-001,12.34,"5,397,112.32"
+01/12/2026,Wire Transfer Out,WT-002,"-2,500,000.00","2,897,112.32"

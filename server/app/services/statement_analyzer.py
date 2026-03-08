@@ -28,10 +28,13 @@ _DATE_PATTERNS: List[Tuple[str, str]] = [
     (r'^\d{8}$', 'YYYYMMDD'),
 ]
 
-_NUMERIC_RE = re.compile(r'^-?\d+[.,]?\d*$')
-_CURRENCY_STRIP_RE = re.compile(r'[$€£¥zł₹₽₩₪₺₴₿CHF\s]', re.IGNORECASE)
+_NUMERIC_RE = re.compile(r'^[+-]?\.?\d+\.?\d*$')
+_CURRENCY_STRIP_RE = re.compile(r'[$€£¥zł₹₽₩₪₺₴₿₦CHF\s]', re.IGNORECASE)
+_ISO_CURRENCY_RE = re.compile(r'\b[A-Z]{3}\b')
+_MULTI_CHAR_CURRENCY_RE = re.compile(r'R\$|د\.إ|ر\.س|ج\.م|د\.ك|ر\.ع|د\.ب|ر\.ق|د\.ا')
 
 _CURRENCY_SYMBOLS: Dict[str, str] = {
+    'R$': 'BRL', '₦': 'NGN',
     '$': 'USD', '€': 'EUR', '£': 'GBP', '¥': 'JPY', 'zł': 'PLN', '₹': 'INR',
     '₽': 'RUB', '₩': 'KRW', '₪': 'ILS', '₺': 'TRY', '₴': 'UAH', '₿': 'BTC',
     'د.إ': 'AED', 'ر.س': 'SAR', 'ج.م': 'EGP', 'د.ك': 'KWD', 'ر.ع': 'OMR',
@@ -210,10 +213,20 @@ def check_existing_parsing_preferences(bank_name: str, user_id: str) -> Optional
 # ---------------------------------------------------------------------------
 
 def _is_numeric_value(val: str) -> bool:
-    """Return True if val looks like a numeric/currency amount (US, EU, Swiss, etc.)."""
-    cleaned = _CURRENCY_STRIP_RE.sub('', val).replace('(', '').replace(')', '').replace("'", '')
+    """Return True if val looks like a numeric/currency amount (US, EU, Swiss, Indian, etc.)."""
+    cleaned = _MULTI_CHAR_CURRENCY_RE.sub('', val)
+    cleaned = _CURRENCY_STRIP_RE.sub('', cleaned)
+    cleaned = cleaned.replace('(', '').replace(')', '').replace("'", '')
     cleaned = cleaned.replace('\xa0', '').replace(' ', '').strip()
+    cleaned = cleaned.lstrip('+')
+    # Strip known ISO currency codes (but NOT arbitrary 3-letter sequences)
+    for code in _CURRENCY_CODES:
+        cleaned = cleaned.replace(code, '')
+    cleaned = cleaned.strip()
     if not cleaned:
+        return False
+    # After all stripping, reject if alphabetic characters remain
+    if re.search(r'[a-zA-Z]', cleaned):
         return False
 
     if ',' in cleaned and '.' in cleaned:
@@ -221,12 +234,15 @@ def _is_numeric_value(val: str) -> bool:
             # EU: 1.234,56 -> 1234.56
             cleaned = cleaned.replace('.', '').replace(',', '.')
         else:
-            # US: 1,234.56 -> 1234.56
+            # US/Indian: 1,234.56 or 1,25,000.00 -> 1234.56 / 125000.00
             cleaned = cleaned.replace(',', '')
     elif ',' in cleaned:
-        parts_after = cleaned.split(',')[-1]
-        if len(parts_after) == 3 and parts_after.replace('-', '').isdigit():
+        parts = cleaned.lstrip('-').split(',')
+        last_part = parts[-1]
+        if len(last_part) == 3 and last_part.isdigit():
             cleaned = cleaned.replace(',', '')  # US thousands: 1,234
+        elif all(p.isdigit() for p in parts if p):
+            cleaned = cleaned.replace(',', '')  # Indian: 1,25,000
         else:
             cleaned = cleaned.replace(',', '.')  # EU decimal: 123,45
     # dots-only: 1.234 could be thousands or decimal — accept either way
