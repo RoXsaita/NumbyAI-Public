@@ -532,6 +532,7 @@ class ApiClient {
 
   async addBank(bankName: string): Promise<void> {
     const currentBanks = await this.getBanks();
+    if (currentBanks.banks.includes(bankName)) return;
     const updatedBanks = [...currentBanks.banks, bankName];
     await this.savePreferences(
       [{

@@ -697,7 +697,7 @@ export const SimpleUpload: React.FC = () => {
       const name = newBankName.trim();
       try {
         await apiClient.addBank(name);
-        setBanks([...banks, name]);
+        if (!banks.includes(name)) setBanks([...banks, name]);
         setBankName(name);
         setShowNewBankInput(false);
       } catch (err) {

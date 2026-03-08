@@ -19,7 +19,7 @@ from app.services.categorization_rules import (
     normalize_rule_input,
 )
 from app.services.llm_service import call_llm_json_array, get_llm_status
-from app.tools.category_helpers import ALL_VALID_CATEGORIES, MANUAL_REVIEW, normalize_category
+from app.tools.category_helpers import ALL_VALID_CATEGORIES, MANUAL_REVIEW, normalize_category, get_custom_categories
 from app.utils import safe_emit_progress
 
 logger = create_logger("rule_analysis_service")
@@ -370,6 +370,7 @@ def _build_llm_candidates(findings: Sequence[FindingDraft]) -> List[Dict[str, An
 
 def _validate_findings_with_llm(
     findings: Sequence[FindingDraft],
+    extra_categories: Optional[List[str]] = None,
 ) -> Optional[Dict[int, Dict[str, Any]]]:
     status = get_llm_status()
     if not status.get("available"):
@@ -379,9 +380,10 @@ def _validate_findings_with_llm(
     if not candidates:
         return None
 
+    all_cats = ALL_VALID_CATEGORIES + [c for c in (extra_categories or []) if c not in ALL_VALID_CATEGORIES]
     prompt = render_prompt(
         load_prompt("analyze_rule_clusters.txt"),
-        categories=", ".join(ALL_VALID_CATEGORIES),
+        categories=", ".join(all_cats),
         candidates=json.dumps(candidates[:200], indent=2, default=str),
     )
 
@@ -570,6 +572,7 @@ def _suggest_rules_for_singletons(
     rules: Sequence[CategorizationRule],
     add_finding: Callable[[FindingDraft, str], None],
     progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    extra_categories: Optional[List[str]] = None,
 ) -> None:
     """Use LLM to suggest rules for uncovered singleton transactions."""
     status = get_llm_status()
@@ -588,9 +591,10 @@ def _suggest_rules_for_singletons(
             "date": tx.date.isoformat() if tx.date else "",
         })
 
+    all_cats = ALL_VALID_CATEGORIES + [c for c in (extra_categories or []) if c not in ALL_VALID_CATEGORIES]
     prompt = render_prompt(
         load_prompt("suggest_rules_uncovered.txt"),
-        categories=", ".join(ALL_VALID_CATEGORIES),
+        categories=", ".join(all_cats),
         transactions=json.dumps(batch, indent=2, default=str),
     )
 
@@ -667,6 +671,8 @@ def analyze_rules_for_user(
     progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
 ) -> Tuple[List[FindingDraft], Dict[str, Any]]:
     """Analyze existing transactions and rules, returning actionable findings."""
+
+    custom_categories = get_custom_categories(user_id)
 
     db = SessionLocal()
     try:
@@ -1030,7 +1036,7 @@ def analyze_rules_for_user(
             uncovered_singletons.extend(items)
 
     if uncovered_singletons:
-        _suggest_rules_for_singletons(uncovered_singletons, rules, add_finding, progress_callback)
+        _suggest_rules_for_singletons(uncovered_singletons, rules, add_finding, progress_callback, extra_categories=custom_categories)
 
     _emit(progress_callback, {
         "type": "analysis_stage",
@@ -1039,7 +1045,7 @@ def analyze_rules_for_user(
         "uncovered_singletons": len(uncovered_singletons),
     })
 
-    llm_decisions = _validate_findings_with_llm(findings)
+    llm_decisions = _validate_findings_with_llm(findings, extra_categories=custom_categories)
     if llm_decisions is not None:
         filtered: List[FindingDraft] = []
         discarded = 0

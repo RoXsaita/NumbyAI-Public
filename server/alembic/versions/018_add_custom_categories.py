@@ -18,7 +18,7 @@ def upgrade():
     op.create_table(
         'custom_categories',
         sa.Column('id', sa.String(36), primary_key=True),
-        sa.Column('user_id', sa.String(36), sa.ForeignKey('users.id'), nullable=False, index=True),
+        sa.Column('user_id', sa.String(36), sa.ForeignKey('users.id'), nullable=False),
         sa.Column('name', sa.String(100), nullable=False),
         sa.Column('created_at', sa.DateTime, nullable=False, server_default=sa.func.now()),
     )
