@@ -6,7 +6,6 @@ to detect columns, date formats, currency, etc. Falls back to the LLM when
 heuristic confidence is low.
 """
 import csv
-import io
 import os
 import pandas as pd
 import re

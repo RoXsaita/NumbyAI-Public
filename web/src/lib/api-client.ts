@@ -376,6 +376,11 @@ class ApiClient {
     status: string;
     result: Record<string, any>;
   }>;
+  async applyRuleAnalysisFinding(findingId: string, data: { chosen_category?: string }): Promise<{
+    finding_id: string;
+    status: string;
+    result: Record<string, any>;
+  }>;
   async applyRuleAnalysisFinding(
     findingId: string,
     data?: {
@@ -590,7 +595,6 @@ class ApiClient {
   async processStatement(
     file: File,
     bankName: string,
-    netFlow?: number,
     headerMapping?: {
       column_mappings: any;
       amount_column_inversions?: Record<string, boolean>;
@@ -601,7 +605,6 @@ class ApiClient {
       currency?: string;
     },
     excludedTransactionRows?: number[],
-    llmProvider?: StatementLlmProvider
   ): Promise<{
     status: string;
     transactions_processed?: number;
@@ -611,10 +614,8 @@ class ApiClient {
   }> {
     const response = await this.fetchWithFormData('/api/statements/process', file, {
       bank_name: bankName,
-      net_flow: netFlow !== undefined ? netFlow.toString() : undefined,
       header_mapping: headerMapping ? JSON.stringify(headerMapping) : undefined,
       excluded_transaction_rows: excludedTransactionRows ? JSON.stringify(excludedTransactionRows) : undefined,
-      llm_provider: llmProvider,
     });
     return response.json();
   }

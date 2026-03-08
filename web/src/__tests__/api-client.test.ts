@@ -1,7 +1,5 @@
 import { apiClient } from '../lib/api-client';
 
-import { apiClient } from '../lib/api-client';
-
 describe('ApiClient statement processing', () => {
   const originalFetch = global.fetch;
 
@@ -19,8 +17,7 @@ describe('ApiClient statement processing', () => {
             .fn()
             .mockResolvedValueOnce({
               done: false,
-              value: new TextEncoder().encode('data: {"type":"complete","result":{"status":"success"}}
-'),
+              value: new TextEncoder().encode('data: {"type":"complete","result":{"status":"success"}}\n'),
             })
             .mockResolvedValueOnce({ done: true, value: undefined }),
         }),
@@ -30,8 +27,7 @@ describe('ApiClient statement processing', () => {
     global.fetch = fetchMock as typeof fetch;
 
     await apiClient.processStatementStream(
-      new File(['date,description,amount
-'], 'statement.csv', { type: 'text/csv' }),
+      new File(['date,description,amount\n'], 'statement.csv', { type: 'text/csv' }),
       'ProviderBank',
       undefined,
       undefined,
@@ -89,6 +85,8 @@ describe('ApiClient parsing preference persistence', () => {
           invert_amount_sign: true,
           date_format: 'DD/MM/YYYY',
           currency: 'PLN',
+          number_format: 'auto',
+          delimiter: ',',
           has_headers: true,
           skip_rows: 0,
           first_transaction_row: 4,
