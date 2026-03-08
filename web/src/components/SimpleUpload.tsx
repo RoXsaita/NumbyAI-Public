@@ -2,13 +2,12 @@
  * Simple Upload Page - Multi-step Statement Processing Wizard
  * 
  * Step-by-step flow:
- * 1. File upload
- * 2. Currency selection (if needed)
- * 3. Bank selection
- * 4. Header mapping (if parsing preferences don't exist)
- * 5. Net flow input
- * 6. Processing
- * 7. Dashboard
+ * 1. Bank selection (required first — determines whether AI analysis is needed)
+ * 2. File upload (bank with saved rules skips AI; new bank runs analysis)
+ * 3. Currency selection (if needed)
+ * 4. Header mapping (new banks only, pre-populated by auto-detection)
+ * 5. Processing
+ * 6. Dashboard
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
@@ -634,6 +633,27 @@ export const SimpleUpload: React.FC = () => {
   const handleFileSelect = async (selectedFile: File) => {
     if (!selectedFile) return;
 
+    // Resolve bank name: if user typed a new bank name, register it first
+    let resolvedBank = bankName;
+    if (showNewBankInput && newBankName.trim()) {
+      try {
+        await apiClient.addBank(newBankName.trim());
+        resolvedBank = newBankName.trim();
+        setBanks(prev => [...prev, resolvedBank]);
+        setBankName(resolvedBank);
+        setShowNewBankInput(false);
+        setNewBankName('');
+      } catch (err) {
+        setError(getErrorMessage(err, 'Failed to add bank'));
+        return;
+      }
+    }
+
+    if (!resolvedBank) {
+      setError('Please select a bank first');
+      return;
+    }
+
     setFile(selectedFile);
     setError(null);
     setExcludedTransactionRows([]);
@@ -641,29 +661,29 @@ export const SimpleUpload: React.FC = () => {
     setUploadProgress('Uploading your statement...');
 
     try {
-      setUploadProgress('Analyzing structure and detecting columns...');
+      setUploadProgress(
+        'Checking saved rules...'
+      );
 
-      // Upload file and get analysis
-      const result = await apiClient.uploadStatement(selectedFile, undefined, bankName || undefined);
-      setUploadProgress('Preparing mapping preview...');
+      const result = await apiClient.uploadStatement(selectedFile, undefined, resolvedBank);
+      setUploadProgress('');
       setUploadResult(result);
       setIsUploading(false);
-      setUploadProgress('');
 
-      // Check if currency is required
+      if (result.currency_detected) {
+        setCurrency(result.currency_detected);
+      }
+
       if (result.currency_required && !userCurrency) {
-        setCurrency(result.currency_detected || '');
         setStep('currency_selection');
         return;
       }
-
-      // Stay on main screen (file_upload step) - user can now select bank and enter net flow
     } catch (err) {
       console.error('Upload error:', err);
       setIsUploading(false);
       setUploadProgress('');
       setError(getErrorMessage(err, 'Failed to upload file'));
-      setStep('file_upload'); // Stay on file upload step on error
+      setStep('file_upload');
     }
   };
 
@@ -814,7 +834,7 @@ export const SimpleUpload: React.FC = () => {
           if (suggested.first_transaction_row) {
             setFirstTransactionRow(suggested.first_transaction_row);
           }
-          if (suggested.currency && !userCurrency) {
+          if (suggested.currency) {
             setCurrency(suggested.currency);
           }
         } else {
@@ -2215,7 +2235,7 @@ export const SimpleUpload: React.FC = () => {
               color: '#6b7280',
               margin: 0,
             }}>
-              {step === 'file_upload' && (isUploading ? 'Analyzing your statement...' : 'Upload your bank statement')}
+              {step === 'file_upload' && (isUploading ? 'Analyzing your statement...' : (!bankName && !showNewBankInput) ? 'Select your bank to get started' : 'Upload your bank statement')}
               {step === 'currency_selection' && 'Select your currency'}
               {step === 'header_mapping' && (isAutoDetected ? 'Review detected columns' : 'Map statement columns')}
             </p>
@@ -2290,95 +2310,7 @@ export const SimpleUpload: React.FC = () => {
           {/* Step 1: Main Screen - File Upload, Bank Selection, Net Flow */}
           {step === 'file_upload' && (
             <div>
-              {/* File Upload Section */}
-              <div style={{ marginBottom: '24px' }}>
-                <label style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  color: '#374151',
-                  marginBottom: '8px',
-                }}>
-                  Bank Statement (CSV/Excel)
-                </label>
-                <input
-                  type="file"
-                  accept=".csv,.xlsx,.xls"
-                  onChange={(e) => {
-                    const selectedFile = e.target.files?.[0];
-                    if (selectedFile) handleFileSelect(selectedFile);
-                  }}
-                  disabled={isUploading}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '2px dashed #d1d5db',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    cursor: isUploading ? 'not-allowed' : 'pointer',
-                    opacity: isUploading ? 0.6 : 1,
-                  }}
-                />
-                {file && (
-                  <div style={{ marginTop: '12px' }}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      marginBottom: isUploading ? '12px' : '0',
-                    }}>
-                      <span style={{ fontSize: '14px', color: '#6b7280' }}>
-                        Selected: <strong>{file.name}</strong>
-                      </span>
-                      {isUploading && (
-                        <div style={{
-                          width: '16px',
-                          height: '16px',
-                          border: '2px solid #f3f4f6',
-                          borderTop: '2px solid #dc2626',
-                          borderRadius: '50%',
-                          animation: 'spin 0.8s linear infinite',
-                        }} />
-                      )}
-                    </div>
-
-                    {isUploading && uploadProgress && (
-                      <div style={{
-                        marginTop: '12px',
-                        padding: '12px',
-                        backgroundColor: '#f9fafb',
-                        borderRadius: '8px',
-                        border: '1px solid #e5e7eb',
-                      }}>
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '12px',
-                          marginBottom: '8px',
-                        }}>
-                          <div style={{
-                            width: '20px',
-                            height: '20px',
-                            border: '3px solid #f3f4f6',
-                            borderTop: '3px solid #dc2626',
-                            borderRadius: '50%',
-                            animation: 'spin 0.8s linear infinite',
-                          }} />
-                          <span style={{
-                            fontSize: '14px',
-                            fontWeight: 600,
-                            color: '#374151',
-                          }}>
-                            {uploadProgress}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Bank Selection Section */}
+              {/* Bank Selection Section — must be selected before uploading */}
               <div style={{ marginBottom: '24px' }}>
                 <label style={{
                   display: 'block',
@@ -2541,6 +2473,104 @@ export const SimpleUpload: React.FC = () => {
                 )}
               </div>
 
+              {/* File Upload Section — enabled only after bank is selected */}
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: '8px',
+                }}>
+                  Bank Statement (CSV/Excel)
+                </label>
+                {!bankName && !showNewBankInput && (
+                  <div style={{
+                    fontSize: '12px',
+                    color: '#9ca3af',
+                    marginBottom: '8px',
+                    fontStyle: 'italic',
+                  }}>
+                    Select a bank above to enable file upload
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  onChange={(e) => {
+                    const selectedFile = e.target.files?.[0];
+                    if (selectedFile) handleFileSelect(selectedFile);
+                  }}
+                  disabled={isUploading || (!bankName && !showNewBankInput)}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '2px dashed #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    cursor: (isUploading || (!bankName && !showNewBankInput)) ? 'not-allowed' : 'pointer',
+                    opacity: (isUploading || (!bankName && !showNewBankInput)) ? 0.5 : 1,
+                  }}
+                />
+                {file && (
+                  <div style={{ marginTop: '12px' }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      marginBottom: isUploading ? '12px' : '0',
+                    }}>
+                      <span style={{ fontSize: '14px', color: '#6b7280' }}>
+                        Selected: <strong>{file.name}</strong>
+                      </span>
+                      {isUploading && (
+                        <div style={{
+                          width: '16px',
+                          height: '16px',
+                          border: '2px solid #f3f4f6',
+                          borderTop: '2px solid #dc2626',
+                          borderRadius: '50%',
+                          animation: 'spin 0.8s linear infinite',
+                        }} />
+                      )}
+                    </div>
+
+                    {isUploading && uploadProgress && (
+                      <div style={{
+                        marginTop: '12px',
+                        padding: '12px',
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '8px',
+                        border: '1px solid #e5e7eb',
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          marginBottom: '8px',
+                        }}>
+                          <div style={{
+                            width: '20px',
+                            height: '20px',
+                            border: '3px solid #f3f4f6',
+                            borderTop: '3px solid #dc2626',
+                            borderRadius: '50%',
+                            animation: 'spin 0.8s linear infinite',
+                          }} />
+                          <span style={{
+                            fontSize: '14px',
+                            fontWeight: 600,
+                            color: '#374151',
+                          }}>
+                            {uploadProgress}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '13px', fontWeight: 600, color: '#6b7280' }}>Processing model:</span>
                 <span style={{
@@ -2575,10 +2605,11 @@ export const SimpleUpload: React.FC = () => {
               >
                 {isUploading ? 'Uploading...' :
                   isLoadingBankPrefs ? 'Loading saved settings...' :
-                    !file && !uploadResult ? 'Upload a file first' :
-                      hasSavedMappings ? 'Review Mapping' :
-                        hasParsingPreferences ? 'Process Statement' :
-                          'Continue to Mapping'}
+                    (!bankName && !showNewBankInput) ? 'Select a bank first' :
+                      !file && !uploadResult ? 'Upload a file' :
+                        hasSavedMappings ? 'Review Mapping' :
+                          hasParsingPreferences ? 'Process Statement' :
+                            'Continue to Mapping'}
               </button>
             </div>
           )}
