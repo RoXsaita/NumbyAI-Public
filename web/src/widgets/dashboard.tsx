@@ -6570,6 +6570,11 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
                               }}
                             >
                               {formatCurrency(tx.amount, currency)}
+                              {tx.original_currency && tx.original_amount != null && (
+                                <div style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.tertiary, marginTop: 1 }} title={`Rate: ${tx.exchange_rate?.toFixed(4) ?? '?'}`}>
+                                  {formatCurrency(tx.original_amount, tx.original_currency)}
+                                </div>
+                              )}
                             </td>
                             <td style={{ padding: SPACING.sm, minWidth: 160 }}>
                               {isEditing ? (

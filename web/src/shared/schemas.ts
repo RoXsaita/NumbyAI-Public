@@ -22,7 +22,7 @@ export const transactionSchema = z.object({
   id: z.string(),
   transaction_date: z.string(), // ISO 8601 date string
   description: z.string(),
-  amount: z.number(), // Positive = inflow, Negative = outflow
+  amount: z.number(), // Positive = inflow, Negative = outflow (in functional currency)
   currency: z.string(),
   category: z.string(),
 
@@ -30,6 +30,11 @@ export const transactionSchema = z.object({
   merchant: z.string().optional(),
   notes: z.string().optional(),
   tags: z.array(z.string()).optional(),
+
+  // Currency conversion fields (populated when statement currency != functional currency)
+  original_amount: z.number().optional().nullable(),
+  original_currency: z.string().optional().nullable(),
+  exchange_rate: z.number().optional().nullable(),
 });
 
 export type Transaction = z.infer<typeof transactionSchema>;

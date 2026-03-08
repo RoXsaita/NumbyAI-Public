@@ -126,6 +126,9 @@ class Transaction(Base):
     amount = Column(Numeric(12, 2), nullable=False)  # Negative for expenses, positive for income
     currency = Column(String(3), nullable=False)
     category = Column(String(100), nullable=False, index=True)
+    original_amount = Column(Numeric(12, 2), nullable=True)  # Pre-conversion amount (NULL if no conversion)
+    original_currency = Column(String(3), nullable=True)  # Statement's native currency when != functional
+    exchange_rate = Column(Numeric(18, 8), nullable=True)  # Rate applied: functional_ccy / original_ccy
     category_source = Column(String(20), nullable=True, index=True)  # 'rule', 'ai', 'manual'
     bank_name = Column(String(100), nullable=False, index=True)
     profile = Column(String(50), nullable=True, index=True)  # Household profile (e.g., "Me", "Partner", "Joint")

@@ -26,7 +26,7 @@ class Transaction(BaseModel):
     id: str
     transaction_date: str  # ISO 8601 date string
     description: str
-    amount: float  # Positive = inflow, Negative = outflow
+    amount: float  # Positive = inflow, Negative = outflow (in functional currency)
     currency: str
     category: str
 
@@ -34,6 +34,11 @@ class Transaction(BaseModel):
     merchant: Optional[str] = None
     notes: Optional[str] = None
     tags: Optional[List[str]] = None
+
+    # Currency conversion fields (populated when statement currency != functional currency)
+    original_amount: Optional[float] = None
+    original_currency: Optional[str] = None
+    exchange_rate: Optional[float] = None
 
     # Allow arbitrary types for DB model conversion
     model_config = ConfigDict(from_attributes=True)
