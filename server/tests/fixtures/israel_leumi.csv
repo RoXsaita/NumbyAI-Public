@@ -1,0 +1,16 @@
+Bank Leumi - דף חשבון
+Account / חשבון,IL620108000000099999999
+Branch / סניף,Tel Aviv Main
+Period / תקופה,01/01/2026 - 31/01/2026
+,
+Date,Value Date,Description,Reference,Debit (₪),Credit (₪),Balance (₪)
+02/01/2026,02/01/2026,Salary - WAZE LTD,MSK-001,,"25,000.00","52,340.50"
+03/01/2026,03/01/2026,Rent Payment,HOK-101,"6,500.00",,"45,840.50"
+04/01/2026,04/01/2026,Israel Electric Corp,HOK-102,"485.00",,"45,355.50"
+05/01/2026,05/01/2026,Shufersal Deal,POS-201,"312.80",,"45,042.70"
+06/01/2026,06/01/2026,Partner Communications,HOK-103,"149.90",,"44,892.80"
+07/01/2026,07/01/2026,Transfer from David,,,"1,200.00","46,092.80"
+08/01/2026,08/01/2026,Aroma TLV Rothschild,POS-202,"78.00",,"46,014.80"
+10/01/2026,10/01/2026,Mekorot Water,HOK-104,"210.00",,"45,804.80"
+12/01/2026,12/01/2026,Harel Insurance,HOK-105,"1,850.00",,"43,954.80"
+15/01/2026,15/01/2026,ATM Dizengoff Center,ATM-301,"1,000.00",,"42,954.80"

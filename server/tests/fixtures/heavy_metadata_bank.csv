@@ -1,0 +1,23 @@
+*** CONFIDENTIAL ***
+First National Bank - Monthly Account Statement
+Generated: 08/03/2026 14:32:05
+Report ID: RPT-2026-00451
+Page 1 of 1
+Customer: John Smith
+Account Number: 1234567890
+Account Type: Checking
+Branch: Downtown Main
+Statement Period: 01/01/2026 - 31/01/2026
+Opening Balance: $5,230.45
+,,,,,
+Date,Description,Reference,Debit,Credit,Balance
+01/02/2026,Direct Deposit - ACME Corp,DD-001,,"3,500.00","8,730.45"
+01/03/2026,Electric Company,CHK-1001,"125.50",,"8,604.95"
+01/05/2026,Grocery Store,POS-2001,"87.32",,"8,517.63"
+01/06/2026,Gas Station,POS-2002,"45.00",,"8,472.63"
+01/07/2026,Internet Provider,ACH-001,"79.99",,"8,392.64"
+01/08/2026,Transfer from Savings,TRF-001,,"500.00","8,892.64"
+01/10/2026,Restaurant,POS-2003,"62.40",,"8,830.24"
+01/12/2026,Insurance Premium,ACH-002,"250.00",,"8,580.24"
+01/15/2026,ATM Withdrawal,ATM-001,"200.00",,"8,380.24"
+01/20/2026,Phone Bill,ACH-003,"95.00",,"8,285.24"

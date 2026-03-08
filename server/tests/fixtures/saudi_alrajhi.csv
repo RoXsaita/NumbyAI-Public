@@ -1,0 +1,15 @@
+Al Rajhi Bank - كشف حساب
+Account / رقم الحساب,SA0380000000608010167519
+Period / الفترة,01/01/2026 - 31/01/2026
+,
+Transaction Date,Value Date,Description,Debit (SAR),Credit (SAR),Balance (SAR)
+02/01/2026,02/01/2026,Salary Transfer - ARAMCO,"","45,000.00","78,500.25"
+03/01/2026,03/01/2026,Rent Payment SADEEM,"8,000.00","","70,500.25"
+04/01/2026,04/01/2026,STC Telecom,"350.00","","70,150.25"
+05/01/2026,05/01/2026,Panda Hypermarket,"425.80","","69,724.45"
+06/01/2026,06/01/2026,Saudi Electricity SEC,"520.00","","69,204.45"
+07/01/2026,07/01/2026,Transfer from Mohammed,"","2,000.00","71,204.45"
+08/01/2026,08/01/2026,Jarir Bookstore,"189.00","","71,015.45"
+10/01/2026,10/01/2026,Water Authority NWC,"145.00","","70,870.45"
+12/01/2026,12/01/2026,Tawuniya Insurance,"1,800.00","","69,070.45"
+15/01/2026,15/01/2026,ATM Withdrawal,"2,000.00","","67,070.45"

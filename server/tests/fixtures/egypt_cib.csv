@@ -1,0 +1,17 @@
+CIB Egypt - Account Statement
+Account,EG800002000156789012345678901
+Branch,New Cairo Branch
+Period,01/01/2026 to 31/01/2026
+Currency,EGP
+,,,,,,
+Date,Description,Reference No.,Debit,Credit,Running Balance
+02/01/2026,Salary - VODAFONE EGYPT,SAL-20260102,,"85,000.00","142,350.80"
+03/01/2026,Rent Payment - MAADI TOWERS,TRF-20260103,"12,000.00",,"130,350.80"
+04/01/2026,Electricity Bill - SOUTH CAIRO,BPY-20260104,"1,280.00",,"129,070.80"
+05/01/2026,Carrefour City Stars,POS-20260105,"2,450.00",,"126,620.80"
+06/01/2026,Vodafone Bill,DDR-20260106,"650.00",,"125,970.80"
+07/01/2026,ATM Cash Withdrawal,ATM-20260107,"5,000.00",,"120,970.80"
+08/01/2026,Uber Ride,POS-20260108,"185.50",,"120,785.30"
+10/01/2026,Transfer from Family,,,"10,000.00","130,785.30"
+12/01/2026,AXA Insurance Premium,DDR-20260112,"3,500.00",,"127,285.30"
+15/01/2026,Gas Bill - TOWN GAS,BPY-20260115,"420.00",,"126,865.30"
