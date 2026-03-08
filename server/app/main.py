@@ -152,6 +152,14 @@ def _serialize_transactions_for_json(transactions: List[Dict[str, Any]]) -> List
     return serialized
 
 
+def _add_conversion_fields(entry: Dict[str, Any], tx: Transaction) -> None:
+    """Append original_amount/currency/exchange_rate to a serialized dict when present."""
+    if tx.original_currency:
+        entry["original_amount"] = float(tx.original_amount) if tx.original_amount is not None else None
+        entry["original_currency"] = tx.original_currency
+        entry["exchange_rate"] = float(tx.exchange_rate) if tx.exchange_rate is not None else None
+
+
 def _coerce_decimal(value: Any) -> Optional[Decimal]:
     if isinstance(value, Decimal):
         return value
@@ -1859,18 +1867,22 @@ async def get_transactions(request: Request) -> JSONResponse:
                 query = query.filter(Transaction.date <= date_to)
 
             transactions = query.order_by(Transaction.date.desc()).limit(1000).all()
-            result = [{
-                "id": str(tx.id),
-                "date": tx.date.isoformat() if tx.date else None,
-                "description": tx.description,
-                "merchant": tx.merchant,
-                "amount": float(tx.amount),
-                "currency": tx.currency,
-                "category": tx.category,
-                "category_source": tx.category_source,
-                "bank_name": tx.bank_name,
-                "profile": tx.profile,
-            } for tx in transactions]
+            result = []
+            for tx in transactions:
+                entry = {
+                    "id": str(tx.id),
+                    "date": tx.date.isoformat() if tx.date else None,
+                    "description": tx.description,
+                    "merchant": tx.merchant,
+                    "amount": float(tx.amount),
+                    "currency": tx.currency,
+                    "category": tx.category,
+                    "category_source": tx.category_source,
+                    "bank_name": tx.bank_name,
+                    "profile": tx.profile,
+                }
+                _add_conversion_fields(entry, tx)
+                result.append(entry)
             return JSONResponse({"transactions": result, "count": len(result)})
         finally:
             db.close()
@@ -2192,6 +2204,7 @@ async def get_review_queue(request: Request) -> JSONResponse:
                     "review_category": tx.review_category,
                     "review_reason": tx.review_reason,
                 }
+                _add_conversion_fields(item, tx)
                 review_items.append(item)
 
             priority_order = {"ai_conflict": 0, "manual_review": 1, "high_amount": 2, "recurring": 3}
@@ -2249,17 +2262,21 @@ async def get_manual_review_transactions(request: Request) -> JSONResponse:
 
             total = query.count()
             transactions = query.order_by(Transaction.date.desc()).offset(offset).limit(limit).all()
-            result = [{
-                "id": str(tx.id),
-                "date": tx.date.isoformat() if tx.date else None,
-                "description": tx.description,
-                "merchant": tx.merchant,
-                "amount": float(tx.amount),
-                "currency": tx.currency,
-                "category": tx.category,
-                "bank_name": tx.bank_name,
-                "profile": tx.profile,
-            } for tx in transactions]
+            result = []
+            for tx in transactions:
+                entry = {
+                    "id": str(tx.id),
+                    "date": tx.date.isoformat() if tx.date else None,
+                    "description": tx.description,
+                    "merchant": tx.merchant,
+                    "amount": float(tx.amount),
+                    "currency": tx.currency,
+                    "category": tx.category,
+                    "bank_name": tx.bank_name,
+                    "profile": tx.profile,
+                }
+                _add_conversion_fields(entry, tx)
+                result.append(entry)
             return JSONResponse({
                 "transactions": result,
                 "count": len(result),
@@ -2363,7 +2380,9 @@ async def get_review_conflicts(request: Request) -> JSONResponse:
             total = query.count()
             transactions = query.order_by(Transaction.date.desc()).offset(offset).limit(limit).all()
 
-            result = [{
+            result = []
+            for tx in transactions:
+                entry = {
                     "id": str(tx.id),
                     "date": tx.date.isoformat() if tx.date else None,
                     "description": tx.description,
@@ -2376,7 +2395,9 @@ async def get_review_conflicts(request: Request) -> JSONResponse:
                     "review_status": tx.review_status,
                     "review_category": tx.review_category,
                     "review_reason": tx.review_reason,
-                } for tx in transactions]
+                }
+                _add_conversion_fields(entry, tx)
+                result.append(entry)
 
             return JSONResponse({
                 "transactions": result,
