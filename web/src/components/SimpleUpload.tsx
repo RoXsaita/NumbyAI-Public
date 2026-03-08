@@ -906,7 +906,7 @@ export const SimpleUpload: React.FC = () => {
       has_headers: false, // Always false - we use first_transaction_row instead
       first_transaction_row: firstTransactionRow,
       date_format: uploadResult?.suggested_mappings?.date_format || uploadResult?.analysis?.date_format || 'DD/MM/YYYY',
-      currency: currency || userCurrency || 'USD',
+      currency: currency || uploadResult?.currency_detected || 'USD',
       number_format: uploadResult?.suggested_mappings?.number_format || 'auto',
       delimiter: uploadResult?.suggested_mappings?.delimiter || ',',
     };
