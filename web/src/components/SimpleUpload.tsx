@@ -2360,87 +2360,100 @@ export const SimpleUpload: React.FC = () => {
                   Bank Name *
                 </label>
                 {!showNewBankInput ? (
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <select
-                      value={bankName}
-                      onChange={(e) => setBankName(e.target.value)}
+                  <select
+                    value={bankName}
+                    onChange={(e) => {
+                      if (e.target.value === '__add_new__') {
+                        setShowNewBankInput(true);
+                        setBankName('');
+                      } else {
+                        setBankName(e.target.value);
+                      }
+                    }}
+                    disabled={isUploading}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      opacity: isUploading ? 0.6 : 1,
+                      cursor: isUploading ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    <option value="">Select bank...</option>
+                    {banks.map(bank => (
+                      <option key={bank} value={bank}>{bank}</option>
+                    ))}
+                    <option value="__add_new__">— Add new bank —</option>
+                  </select>
+                ) : (
+                  <div>
+                    <input
+                      type="text"
+                      value={newBankName}
+                      onChange={(e) => setNewBankName(e.target.value)}
+                      placeholder="Enter bank name..."
                       disabled={isUploading}
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newBankName.trim()) {
+                          const name = newBankName.trim();
+                          if (!banks.includes(name)) setBanks([...banks, name]);
+                          setBankName(name);
+                          setNewBankName('');
+                          setShowNewBankInput(false);
+                        }
+                        if (e.key === 'Escape') { setShowNewBankInput(false); setNewBankName(''); }
+                      }}
                       style={{
-                        flex: 1,
+                        width: '100%',
                         padding: '12px',
-                        border: '1px solid #d1d5db',
+                        border: '1px solid #6366f1',
                         borderRadius: '8px',
                         fontSize: '14px',
                         opacity: isUploading ? 0.6 : 1,
-                        cursor: isUploading ? 'not-allowed' : 'pointer',
+                        outline: 'none',
+                        boxSizing: 'border-box',
                       }}
-                    >
-                      <option value="">Select bank...</option>
-                      {banks.map(bank => (
-                        <option key={bank} value={bank}>{bank}</option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={() => setShowNewBankInput(true)}
-                      disabled={isUploading}
-                      title="Add new bank"
-                      style={{
-                        flexShrink: 0,
-                        width: '44px',
-                        height: '44px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: '#f3f4f6',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '8px',
-                        fontSize: '20px',
-                        color: '#374151',
-                        cursor: isUploading ? 'not-allowed' : 'pointer',
-                        opacity: isUploading ? 0.6 : 1,
-                        lineHeight: 1,
-                      }}
-                    >
-                      +
-                    </button>
-                  </div>
-                ) : (
-                  <div>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
-                      <input
-                        type="text"
-                        value={newBankName}
-                        onChange={(e) => setNewBankName(e.target.value)}
-                        placeholder="Enter bank name..."
-                        disabled={isUploading}
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === 'Escape') { setShowNewBankInput(false); setNewBankName(''); }
-                        }}
-                        style={{
-                          flex: 1,
-                          padding: '12px',
-                          border: '1px solid #6366f1',
-                          borderRadius: '8px',
-                          fontSize: '14px',
-                          opacity: isUploading ? 0.6 : 1,
-                          outline: 'none',
-                        }}
-                      />
+                    />
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                      {newBankName.trim() && (
+                        <button
+                          onClick={() => {
+                            const name = newBankName.trim();
+                            if (!banks.includes(name)) setBanks([...banks, name]);
+                            setBankName(name);
+                            setNewBankName('');
+                            setShowNewBankInput(false);
+                          }}
+                          disabled={isUploading}
+                          style={{
+                            padding: '6px 14px',
+                            backgroundColor: '#6366f1',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '13px',
+                            cursor: isUploading ? 'not-allowed' : 'pointer',
+                            opacity: isUploading ? 0.6 : 1,
+                          }}
+                        >
+                          Add Bank
+                        </button>
+                      )}
                       <button
                         onClick={() => { setShowNewBankInput(false); setNewBankName(''); }}
                         disabled={isUploading}
                         style={{
-                          flexShrink: 0,
-                          padding: '8px 14px',
-                          backgroundColor: '#e5e7eb',
-                          color: '#374151',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '8px',
+                          padding: '6px 14px',
+                          backgroundColor: 'transparent',
+                          color: '#6b7280',
+                          border: 'none',
+                          borderRadius: '6px',
                           fontSize: '13px',
                           cursor: isUploading ? 'not-allowed' : 'pointer',
                           opacity: isUploading ? 0.6 : 1,
-                          whiteSpace: 'nowrap',
                         }}
                       >
                         Cancel
@@ -2465,87 +2478,100 @@ export const SimpleUpload: React.FC = () => {
                   Tag transactions to a person (e.g. "Me", "Partner", "Joint"). Optional.
                 </div>
                 {!showNewProfileInput ? (
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <select
-                      value={selectedProfile}
-                      onChange={(e) => setSelectedProfile(e.target.value)}
+                  <select
+                    value={selectedProfile}
+                    onChange={(e) => {
+                      if (e.target.value === '__add_new__') {
+                        setShowNewProfileInput(true);
+                        setSelectedProfile('');
+                      } else {
+                        setSelectedProfile(e.target.value);
+                      }
+                    }}
+                    disabled={isUploading}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      opacity: isUploading ? 0.6 : 1,
+                      cursor: isUploading ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    <option value="">No profile (skip)</option>
+                    {profiles.map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                    <option value="__add_new__">— Add new profile —</option>
+                  </select>
+                ) : (
+                  <div>
+                    <input
+                      type="text"
+                      value={newProfileName}
+                      onChange={(e) => setNewProfileName(e.target.value)}
+                      placeholder="e.g. Me, Partner, Joint..."
                       disabled={isUploading}
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newProfileName.trim()) {
+                          const name = newProfileName.trim();
+                          if (!profiles.includes(name)) setProfiles([...profiles, name]);
+                          setSelectedProfile(name);
+                          setNewProfileName('');
+                          setShowNewProfileInput(false);
+                        }
+                        if (e.key === 'Escape') { setShowNewProfileInput(false); setNewProfileName(''); }
+                      }}
                       style={{
-                        flex: 1,
+                        width: '100%',
                         padding: '12px',
-                        border: '1px solid #d1d5db',
+                        border: '1px solid #6366f1',
                         borderRadius: '8px',
                         fontSize: '14px',
                         opacity: isUploading ? 0.6 : 1,
-                        cursor: isUploading ? 'not-allowed' : 'pointer',
+                        outline: 'none',
+                        boxSizing: 'border-box',
                       }}
-                    >
-                      <option value="">No profile (skip)</option>
-                      {profiles.map(p => (
-                        <option key={p} value={p}>{p}</option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={() => { setShowNewProfileInput(true); setSelectedProfile(''); }}
-                      disabled={isUploading}
-                      title="Add new profile"
-                      style={{
-                        flexShrink: 0,
-                        width: '44px',
-                        height: '44px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: '#f3f4f6',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '8px',
-                        fontSize: '20px',
-                        color: '#374151',
-                        cursor: isUploading ? 'not-allowed' : 'pointer',
-                        opacity: isUploading ? 0.6 : 1,
-                        lineHeight: 1,
-                      }}
-                    >
-                      +
-                    </button>
-                  </div>
-                ) : (
-                  <div>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <input
-                        type="text"
-                        value={newProfileName}
-                        onChange={(e) => setNewProfileName(e.target.value)}
-                        placeholder="e.g. Me, Partner, Joint..."
-                        disabled={isUploading}
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === 'Escape') { setShowNewProfileInput(false); setNewProfileName(''); }
-                        }}
-                        style={{
-                          flex: 1,
-                          padding: '12px',
-                          border: '1px solid #6366f1',
-                          borderRadius: '8px',
-                          fontSize: '14px',
-                          opacity: isUploading ? 0.6 : 1,
-                          outline: 'none',
-                        }}
-                      />
+                    />
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                      {newProfileName.trim() && (
+                        <button
+                          onClick={() => {
+                            const name = newProfileName.trim();
+                            if (!profiles.includes(name)) setProfiles([...profiles, name]);
+                            setSelectedProfile(name);
+                            setNewProfileName('');
+                            setShowNewProfileInput(false);
+                          }}
+                          disabled={isUploading}
+                          style={{
+                            padding: '6px 14px',
+                            backgroundColor: '#6366f1',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '13px',
+                            cursor: isUploading ? 'not-allowed' : 'pointer',
+                            opacity: isUploading ? 0.6 : 1,
+                          }}
+                        >
+                          Add Profile
+                        </button>
+                      )}
                       <button
                         onClick={() => { setShowNewProfileInput(false); setNewProfileName(''); }}
                         disabled={isUploading}
                         style={{
-                          flexShrink: 0,
-                          padding: '8px 14px',
-                          backgroundColor: '#e5e7eb',
-                          color: '#374151',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '8px',
+                          padding: '6px 14px',
+                          backgroundColor: 'transparent',
+                          color: '#6b7280',
+                          border: 'none',
+                          borderRadius: '6px',
                           fontSize: '13px',
                           cursor: isUploading ? 'not-allowed' : 'pointer',
                           opacity: isUploading ? 0.6 : 1,
-                          whiteSpace: 'nowrap',
                         }}
                       >
                         Cancel
