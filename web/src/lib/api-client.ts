@@ -731,6 +731,17 @@ class ApiClient {
     });
     return response.json();
   }
+
+  async getLlmModel(): Promise<string | null> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/health`);
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data?.llm?.model ?? null;
+    } catch {
+      return null;
+    }
+  }
 }
 
 // Export singleton instance

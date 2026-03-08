@@ -131,6 +131,7 @@ export const SimpleUpload: React.FC = () => {
   const [isCalculatingMappingNetFlow, setIsCalculatingMappingNetFlow] = useState(false);
   const [mappingNetFlowError, setMappingNetFlowError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [llmModel, setLlmModel] = useState<string | null>(null);
   const [processingProgress, setProcessingProgress] = useState<string>('');
   type StepStatus = 'pending' | 'active' | 'done' | 'error';
   interface PipelineStep {
@@ -176,6 +177,10 @@ export const SimpleUpload: React.FC = () => {
   const aiTotalTransactionsRef = useRef(0);
   const aiLastProgressAtRef = useRef<number | null>(null);
   const serverStartedAtRef = useRef<string | null>(null);
+  useEffect(() => {
+    apiClient.getLlmModel().then(setLlmModel);
+  }, []);
+
   const netFlowPreviewRequestRef = useRef(0);
   const prevStepRef = useRef<string | null>(null);
   const [duplicateWarning, setDuplicateWarning] = useState<{
@@ -2512,7 +2517,7 @@ export const SimpleUpload: React.FC = () => {
                   padding: '3px 10px',
                   letterSpacing: '0.02em',
                 }}>
-                  Ollama · Local
+                  {llmModel ? `Ollama · ${llmModel}` : 'Ollama · Local'}
                 </span>
               </div>
 
