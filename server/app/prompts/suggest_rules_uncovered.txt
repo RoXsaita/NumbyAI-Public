@@ -1,0 +1,42 @@
+Suggest categorization rules for the following uncovered transactions.
+Each transaction already has a category but no rule covers it.
+Your job is to propose a regex pattern that would match similar future transactions.
+
+Return only a JSON array. Return exactly one object per transaction_id.
+
+Available categories:
+{{categories}}
+
+Transactions:
+{{transactions}}
+
+Rules:
+1. "pattern" must be a valid regex that would match the transaction description or merchant.
+2. Prefer matching on "merchant" (set pattern_field to "merchant") when the merchant field is specific.
+3. Fall back to "description" (set pattern_field to "description") when merchant is empty or generic.
+4. Keep patterns specific enough to avoid false positives but general enough to match variations.
+5. Use regex escaping for literal special characters.
+6. "category" must be one of the available categories listed above.
+7. "confidence" is 0.0 to 1.0. Use higher values for obvious, specific patterns.
+8. "reason" must be one short English sentence explaining the suggestion.
+9. If a transaction is too ambiguous to create a reliable rule, set confidence below 0.5.
+
+JSON format:
+[
+  {
+    "transaction_id": "abc-123",
+    "pattern": "NETFLIX",
+    "pattern_field": "merchant",
+    "category": "Entertainment",
+    "confidence": 0.9,
+    "reason": "Netflix is a streaming service, clearly entertainment."
+  },
+  {
+    "transaction_id": "def-456",
+    "pattern": "UBER\\s*(TRIP|EATS)?",
+    "pattern_field": "description",
+    "category": "Transportation",
+    "confidence": 0.75,
+    "reason": "Uber trips are transportation expenses."
+  }
+]

@@ -1625,6 +1625,44 @@ export const SimpleUpload: React.FC = () => {
             Your Financial Dashboard
           </h2>
         </div>
+        {/* Rule Advisor nudge banner */}
+        <div style={{
+          marginBottom: '20px',
+          padding: '16px 20px',
+          background: 'linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%)',
+          border: '1px solid #bfdbfe',
+          borderRadius: '12px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '16px',
+          flexWrap: 'wrap',
+        }}>
+          <div>
+            <div style={{ fontSize: '15px', fontWeight: 700, color: '#1e40af', marginBottom: '4px' }}>
+              Optimize your categorization rules
+            </div>
+            <div style={{ fontSize: '13px', color: '#3b82f6', lineHeight: 1.5 }}>
+              Run the Rule Advisor in the Review tab to detect conflicts, find uncovered transactions, and get new rule suggestions.
+            </div>
+          </div>
+          <a
+            href="/dashboard?tab=review"
+            style={{
+              padding: '10px 24px',
+              fontSize: '14px',
+              fontWeight: 600,
+              background: '#2563eb',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              textDecoration: 'none',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Open Rule Advisor
+          </a>
+        </div>
         <DashboardWidget initialData={dashboardOverride} />
       </div>
     );

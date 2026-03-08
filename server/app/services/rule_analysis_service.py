@@ -565,6 +565,102 @@ def _audit_rules_catalog(
     return summary
 
 
+def _suggest_rules_for_singletons(
+    singletons: Sequence[Transaction],
+    rules: Sequence[CategorizationRule],
+    add_finding: Callable[[FindingDraft, str], None],
+    progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+) -> None:
+    """Use LLM to suggest rules for uncovered singleton transactions."""
+    status = get_llm_status()
+    if not status.get("available") or not singletons:
+        return
+
+    batch = []
+    for tx in singletons[:100]:
+        batch.append({
+            "id": str(tx.id),
+            "description": tx.description or "",
+            "merchant": tx.merchant or "",
+            "amount": _to_float(tx.amount),
+            "category": tx.category or "",
+            "bank_name": tx.bank_name or "",
+            "date": tx.date.isoformat() if tx.date else "",
+        })
+
+    prompt = render_prompt(
+        load_prompt("suggest_rules_uncovered.txt"),
+        categories=", ".join(ALL_VALID_CATEGORIES),
+        transactions=json.dumps(batch, indent=2, default=str),
+    )
+
+    response_schema = {
+        "type": "array",
+        "items": {
+            "type": "object",
+            "properties": {
+                "transaction_id": {"type": "string"},
+                "pattern": {"type": "string"},
+                "pattern_field": {"type": "string"},
+                "category": {"type": "string"},
+                "confidence": {"type": "number"},
+                "reason": {"type": "string"},
+            },
+            "required": ["transaction_id", "pattern", "category", "confidence", "reason"],
+        },
+    }
+
+    try:
+        parsed = call_llm_json_array(prompt, response_schema)
+    except Exception as exc:
+        logger.warn("Uncovered singleton LLM suggestion failed", {"error": str(exc)})
+        return
+
+    tx_by_id = {str(tx.id): tx for tx in singletons}
+    for item in parsed:
+        if not isinstance(item, dict):
+            continue
+        tx_id = str(item.get("transaction_id") or "")
+        tx = tx_by_id.get(tx_id)
+        if not tx:
+            continue
+        pattern = str(item.get("pattern") or "").strip()
+        category = str(item.get("category") or "").strip()
+        if not pattern or not category:
+            continue
+        try:
+            confidence = max(0.0, min(1.0, float(item.get("confidence", 0.5))))
+        except (TypeError, ValueError):
+            confidence = 0.5
+        if confidence < 0.5:
+            continue
+        reason = str(item.get("reason") or "AI-suggested rule")[:500]
+        pattern_field = str(item.get("pattern_field") or "description").strip()
+        if pattern_field not in ("description", "merchant"):
+            pattern_field = "description"
+
+        add_finding(
+            FindingDraft(
+                finding_type=FINDING_RULE_SUGGESTION,
+                confidence=confidence,
+                bank_name=tx.bank_name,
+                payload={
+                    "name": f"ai:{(tx.merchant or tx.description or 'unknown')[:40]}",
+                    "pattern": pattern,
+                    "pattern_field": pattern_field,
+                    "category": category,
+                    "bank_name": tx.bank_name,
+                    "match_count": 1,
+                    "sample_transaction_ids": [tx_id],
+                    "source": "uncovered_ai",
+                    "reason": reason,
+                    "llm_reason": reason,
+                },
+            ),
+            dedupe_key=f"rulesuggest:ai:{tx.bank_name}:{pattern}:{category}",
+        )
+
+
 def analyze_rules_for_user(
     user_id: str,
     scope_since: date,
@@ -834,6 +930,113 @@ def analyze_rules_for_user(
         "type": "analysis_stage",
         "stage": "cluster_scan_complete",
         "preliminary_findings": len(findings),
+    })
+
+    # --- Merchant-based rule suggestions (even for 1-2 transactions) ---
+    merchant_groups: Dict[Tuple[str, str], List[Transaction]] = defaultdict(list)
+    for tx in transactions:
+        merchant = (tx.merchant or "").strip()
+        if merchant:
+            merchant_groups[(tx.bank_name or "Unknown", merchant)].append(tx)
+
+    for (bank_name, merchant), items in merchant_groups.items():
+        categories = [normalize_category(tx.category or "") for tx in items]
+        categories = [cat for cat in categories if cat and cat != MANUAL_REVIEW]
+        if not categories:
+            continue
+        unique_cats = set(categories)
+        if len(unique_cats) != 1:
+            continue
+        dominant = categories[0]
+        representative = items[0]
+        if _has_equivalent_rule(representative, rules, dominant):
+            continue
+        count = len(items)
+        confidence = 0.65 if count == 1 else (0.75 if count == 2 else 0.85)
+        pattern = re.escape(merchant)
+        add_finding(
+            FindingDraft(
+                finding_type=FINDING_RULE_SUGGESTION,
+                confidence=confidence,
+                bank_name=bank_name if bank_name != "Unknown" else None,
+                payload={
+                    "name": f"merchant:{merchant[:40]}",
+                    "pattern": pattern,
+                    "pattern_field": "merchant",
+                    "category": dominant,
+                    "bank_name": bank_name if bank_name != "Unknown" else None,
+                    "match_count": count,
+                    "sample_transaction_ids": [str(tx.id) for tx in items[:10]],
+                    "source": "merchant_match",
+                    "reason": (
+                        f"All {count} transaction(s) from merchant '{merchant}' "
+                        f"are categorized as '{dominant}'."
+                    ),
+                },
+            ),
+            dedupe_key=f"rulesuggest:merchant:{bank_name}:{pattern}:{dominant}",
+        )
+
+    _emit(progress_callback, {
+        "type": "analysis_stage",
+        "stage": "merchant_scan_complete",
+        "preliminary_findings": len(findings),
+    })
+
+    # --- Uncovered transaction detection ---
+    uncovered_groups: Dict[Tuple[str, str, str], List[Transaction]] = defaultdict(list)
+    uncovered_singletons: List[Transaction] = []
+    for tx in transactions:
+        current_cat = normalize_category(tx.category or "")
+        if not current_cat or current_cat == MANUAL_REVIEW:
+            continue
+        if tx.review_status == "conflict":
+            continue
+        matches = _matching_rules_for_transaction(tx, rules)
+        if matches:
+            continue
+        sig = _normalize_signature(tx.description or "", tx.merchant)
+        key = (tx.bank_name or "Unknown", sig, current_cat)
+        uncovered_groups[key].append(tx)
+
+    for (bank_name, sig, category), items in uncovered_groups.items():
+        if len(items) >= 2:
+            representative = items[0]
+            if _has_equivalent_rule(representative, rules, category):
+                continue
+            pattern = _build_suggestion_pattern(representative, sig)
+            add_finding(
+                FindingDraft(
+                    finding_type=FINDING_RULE_SUGGESTION,
+                    confidence=0.72,
+                    bank_name=bank_name if bank_name != "Unknown" else None,
+                    payload={
+                        "name": f"uncovered:{sig[:40]}",
+                        "pattern": pattern,
+                        "category": category,
+                        "bank_name": bank_name if bank_name != "Unknown" else None,
+                        "match_count": len(items),
+                        "sample_transaction_ids": [str(tx.id) for tx in items[:10]],
+                        "source": "uncovered_pattern",
+                        "reason": (
+                            f"{len(items)} transactions matching '{sig}' are categorized "
+                            f"as '{category}' but have no covering rule."
+                        ),
+                    },
+                ),
+                dedupe_key=f"rulesuggest:uncovered:{bank_name}:{sig}:{category}",
+            )
+        else:
+            uncovered_singletons.extend(items)
+
+    if uncovered_singletons:
+        _suggest_rules_for_singletons(uncovered_singletons, rules, add_finding, progress_callback)
+
+    _emit(progress_callback, {
+        "type": "analysis_stage",
+        "stage": "uncovered_scan_complete",
+        "preliminary_findings": len(findings),
+        "uncovered_singletons": len(uncovered_singletons),
     })
 
     llm_decisions = _validate_findings_with_llm(findings)

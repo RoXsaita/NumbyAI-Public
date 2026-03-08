@@ -2679,7 +2679,7 @@ const parseTransactionQuery = (query: string): ParsedTransactionQuery => {
   return parsed;
 };
 
-const SPENDING_CATEGORIES = [
+const DEFAULT_SPENDING_CATEGORIES: string[] = [
   'Income',
   'Housing & Utilities',
   'Food & Groceries',
@@ -2693,7 +2693,7 @@ const SPENDING_CATEGORIES = [
   'Internal Transfers',
   'Investments',
   'Other',
-] as const;
+];
 
 // Type for preferences data
 interface CategorizationRule {
@@ -2928,6 +2928,24 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
   const [editedBudgets, setEditedBudgets] = useState<Record<string, string>>({});
   const [isSavingBudgets, setIsSavingBudgets] = useState(false);
   
+  // Dynamic categories
+  const [spendingCategories, setSpendingCategories] = useState<string[]>(DEFAULT_SPENDING_CATEGORIES);
+  const [categoriesDetail, setCategoriesDetail] = useState<{ id: string | null; name: string; is_custom: boolean }[]>([]);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+
+  const loadCategories = React.useCallback(async () => {
+    try {
+      const result = await apiClient.getCategories();
+      setSpendingCategories(result.categories || DEFAULT_SPENDING_CATEGORIES);
+      setCategoriesDetail(result.categories_detail || []);
+    } catch {
+      // Fallback to defaults
+    }
+  }, []);
+
+  React.useEffect(() => { loadCategories(); }, [loadCategories]);
+
   // Preferences tab state
   const [preferencesData, setPreferencesData] = useState<PreferencesData | null>(null);
   const [isLoadingPreferences, setIsLoadingPreferences] = useState(false);
@@ -4373,6 +4391,9 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
         loadDataSummary();
       }
     }
+    if (activeTab === 'review') {
+      loadLatestRuleAnalysisRun();
+    }
   }, [activeTab, loadLatestRuleAnalysisRun, dataSummary, isLoadingDataSummary]);
 
   const handleStartRuleAnalysis = async () => {
@@ -4557,7 +4578,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
     return Array.from(new Set([
       ruleAnalysisCurrentCategory,
       ruleAnalysisSuggestedCategory,
-      ...SPENDING_CATEGORIES,
+      ...spendingCategories,
     ].filter(Boolean)));
   }, [ruleAnalysisCurrentCategory, ruleAnalysisSuggestedCategory]);
 
@@ -6818,6 +6839,66 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
         {/* REVIEW TAB */}
         {activeTab === 'review' && (
           <div>
+            {/* Rule Advisor Hero Card */}
+            <Card theme={theme} padding="lg" style={{ marginBottom: SPACING.lg }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: SPACING.lg, flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 260 }}>
+                  <h3 style={{ fontSize: TYPOGRAPHY.sizes.lg, fontWeight: TYPOGRAPHY.weights.bold, margin: 0, marginBottom: SPACING.xs, color: colors.text.primary }}>
+                    Rule Advisor
+                  </h3>
+                  <p style={{ margin: 0, fontSize: TYPOGRAPHY.sizes.sm, color: colors.text.secondary, lineHeight: 1.5, maxWidth: 520 }}>
+                    {!ruleAnalysisRun
+                      ? 'Scan your transactions to detect conflicts, find uncovered patterns, and get rule suggestions — both deterministic and AI-powered.'
+                      : ruleAnalysisRun.status === 'completed'
+                        ? `Last run completed${ruleAnalysisRun.completed_at ? ` on ${new Date(ruleAnalysisRun.completed_at).toLocaleDateString()}` : ''}. ${ruleAnalysisRun.open_findings || 0} open finding(s).`
+                        : ruleAnalysisRun.status === 'failed'
+                          ? `Last run failed${ruleAnalysisRun.error_message ? `: ${ruleAnalysisRun.error_message}` : ''}. Try running again.`
+                          : 'Analysis is running...'}
+                  </p>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: SPACING.sm }}>
+                  <button
+                    onClick={handleStartRuleAnalysis}
+                    disabled={isStartingRuleAnalysis || ruleAnalysisRun?.status === 'queued' || ruleAnalysisRun?.status === 'running'}
+                    style={{
+                      padding: `${SPACING.sm}px ${SPACING.xl}px`,
+                      fontSize: TYPOGRAPHY.sizes.base,
+                      fontWeight: TYPOGRAPHY.weights.semibold,
+                      background: (isStartingRuleAnalysis || ruleAnalysisRun?.status === 'queued' || ruleAnalysisRun?.status === 'running') ? colors.bg.secondary : colors.primary,
+                      color: (isStartingRuleAnalysis || ruleAnalysisRun?.status === 'queued' || ruleAnalysisRun?.status === 'running') ? colors.text.secondary : colors.bg.primary,
+                      border: 'none',
+                      borderRadius: 8,
+                      cursor: (isStartingRuleAnalysis || ruleAnalysisRun?.status === 'queued' || ruleAnalysisRun?.status === 'running') ? 'not-allowed' : 'pointer',
+                      minWidth: 180,
+                    }}
+                  >
+                    {isStartingRuleAnalysis || ruleAnalysisRun?.status === 'queued' || ruleAnalysisRun?.status === 'running'
+                      ? 'Analyzing...'
+                      : 'Run Rule Advisor'}
+                  </button>
+                </div>
+              </div>
+              {ruleAnalysisRun?.status === 'completed' && ruleAnalysisRun.summary && (
+                <div style={{ display: 'flex', gap: SPACING.lg, marginTop: SPACING.md, flexWrap: 'wrap' }}>
+                  {[
+                    { label: 'Conflicts', value: ruleAnalysisRun.summary.tx_conflict || 0, highlight: true },
+                    { label: 'Rule Suggestions', value: ruleAnalysisRun.summary.rule_suggestion || 0, highlight: false },
+                    { label: 'Rule Fixes', value: ruleAnalysisRun.summary.rule_fix || 0, highlight: false },
+                    { label: 'Total Findings', value: ruleAnalysisRun.summary.total_findings || 0, highlight: false },
+                  ].map(stat => (
+                    <div key={stat.label} style={{ padding: `${SPACING.sm}px ${SPACING.md}px`, background: colors.bg.secondary, borderRadius: 8, border: `1px solid ${colors.border.default}`, minWidth: 100 }}>
+                      <div style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary, marginBottom: 2 }}>{stat.label}</div>
+                      <div style={{ fontSize: TYPOGRAPHY.sizes.lg, fontWeight: TYPOGRAPHY.weights.bold, color: stat.highlight && stat.value > 0 ? colors.text.negative : colors.text.primary }}>{stat.value}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {ruleAnalysisError && (
+                <div style={{ marginTop: SPACING.sm, fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.negative }}>{ruleAnalysisError}</div>
+              )}
+            </Card>
+
+            {/* Review Queue Content */}
             <Card theme={theme} padding="lg">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.lg }}>
                 <h3
@@ -6857,7 +6938,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
                       cursor: 'pointer',
                     }}
                   >
-                    Rules Analysis
+                    Rule Advisor Findings
                   </button>
                   <div style={{ fontSize: TYPOGRAPHY.sizes.sm, color: colors.text.secondary }}>
                     {reviewRemainingCount > 0 ? `${reviewRemainingCount} remaining` : ''}
@@ -6901,7 +6982,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
                           style={{ flex: 1, minWidth: 160, padding: `${SPACING.xs}px ${SPACING.sm}px`, fontSize: TYPOGRAPHY.sizes.sm, border: `1px solid ${colors.border.default}`, borderRadius: 6, background: colors.bg.primary, color: colors.text.primary }}
                         >
                           <option value="">Assign category...</option>
-                          {SPENDING_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                          {spendingCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                         </select>
                         <button
                           onClick={handleBulkCategorize}
@@ -7053,7 +7134,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
                                     style={{ width: '100%', maxWidth: 400, padding: `${SPACING.sm}px ${SPACING.md}px`, fontSize: TYPOGRAPHY.sizes.base, border: `1px solid ${colors.border.default}`, borderRadius: 6, background: colors.bg.primary, color: colors.text.primary }}
                                   >
                                     <option value="">Select category...</option>
-                                    {SPENDING_CATEGORIES.map(cat => (
+                                    {spendingCategories.map(cat => (
                                       <option key={cat} value={cat}>{cat}</option>
                                     ))}
                                   </select>
@@ -7133,7 +7214,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
                   color: colors.text.secondary,
                 }}>
                   <div style={{ fontSize: TYPOGRAPHY.sizes.xl, marginBottom: SPACING.md }}>No open findings.</div>
-                  <div>Run Analyze Rules in Preferences to generate a new review queue.</div>
+                  <div>Click "Run Rule Advisor" above to scan your transactions and generate suggestions.</div>
                 </div>
               )}
 
@@ -7610,88 +7691,85 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
                     )}
                   </div>
 
-                  {/* Rule Analysis Section */}
+                  {/* Categories Management Section */}
                   <div>
-                    <h4
-                      style={{
-                        fontSize: TYPOGRAPHY.sizes.md,
-                        fontWeight: TYPOGRAPHY.weights.semibold,
-                        margin: 0,
-                        marginBottom: SPACING.md,
-                        color: colors.text.primary,
-                      }}
-                    >
-                      Rule Analysis
+                    <h4 style={{ fontSize: TYPOGRAPHY.sizes.md, fontWeight: TYPOGRAPHY.weights.semibold, margin: 0, marginBottom: SPACING.md, color: colors.text.primary }}>
+                      Categories
                     </h4>
-                    <div style={{
-                      padding: SPACING.md,
-                      borderRadius: 8,
-                      background: colors.bg.secondary,
-                      border: `1px solid ${colors.border.default}`,
-                    }}>
-                      {ruleAnalysisRun ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.sm }}>
-                          <div style={{ fontSize: TYPOGRAPHY.sizes.sm, color: colors.text.primary }}>
-                            Status: <strong>{ruleAnalysisRun.status}</strong>
-                          </div>
-                          {ruleAnalysisRun.scope_since && (
-                            <div style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary }}>
-                              Scope: {ruleAnalysisRun.scope_since === '1900-01-01' ? 'All historical transactions' : `Since ${ruleAnalysisRun.scope_since}`}
-                            </div>
-                          )}
-                          {ruleAnalysisRun.summary && ruleAnalysisRun.status === 'completed' && (
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: SPACING.sm }}>
-                              <span style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary }}>
-                                Findings: {ruleAnalysisRun.summary.total_findings || 0}
-                              </span>
-                              <span style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary }}>
-                                Conflicts: {ruleAnalysisRun.summary.tx_conflict || 0}
-                              </span>
-                              <span style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary }}>
-                                Rule suggestions: {ruleAnalysisRun.summary.rule_suggestion || 0}
-                              </span>
-                              <span style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary }}>
-                                Rule fixes: {ruleAnalysisRun.summary.rule_fix || 0}
-                              </span>
-                            </div>
-                          )}
-                          {ruleAnalysisRun.error_message && (
-                            <div style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.negative }}>
-                              {ruleAnalysisRun.error_message}
-                            </div>
-                          )}
-                          {ruleAnalysisRun.status === 'completed' && (ruleAnalysisRun.open_findings > 0 || ruleAnalysisFindings.length > 0) && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: SPACING.sm, marginBottom: SPACING.md }}>
+                      {categoriesDetail.map(cat => (
+                        <div key={cat.name} style={{
+                          display: 'flex', alignItems: 'center', gap: 6,
+                          padding: `${SPACING.xs}px ${SPACING.sm}px`,
+                          background: colors.bg.secondary, borderRadius: 6,
+                          border: `1px solid ${colors.border.default}`,
+                          fontSize: TYPOGRAPHY.sizes.sm, color: colors.text.primary,
+                        }}>
+                          {cat.name}
+                          {cat.is_custom && cat.id && (
                             <button
-                              onClick={() => {
-                                setActiveTab('review');
-                                setReviewSource('rules_analysis');
-                                loadRuleAnalysisFindings(ruleAnalysisRun.id);
+                              onClick={async () => {
+                                try {
+                                  await apiClient.deleteCategory(cat.id!);
+                                  await loadCategories();
+                                } catch (err) { console.error(err); }
                               }}
                               style={{
-                                alignSelf: 'flex-start',
-                                padding: `${SPACING.xs}px ${SPACING.sm}px`,
-                                fontSize: TYPOGRAPHY.sizes.sm,
-                                background: colors.primary,
-                                color: colors.bg.primary,
-                                border: 'none',
-                                borderRadius: 4,
-                                cursor: 'pointer',
+                                background: 'none', border: 'none', cursor: 'pointer',
+                                color: colors.text.secondary, fontSize: 14, lineHeight: 1, padding: 0,
                               }}
+                              title="Remove custom category"
                             >
-                              Review Findings
+                              x
                             </button>
                           )}
                         </div>
-                      ) : (
-                        <div style={{ fontSize: TYPOGRAPHY.sizes.sm, color: colors.text.secondary }}>
-                          No analysis run yet. Click Analyze Rules to scan existing transactions and suggest fixes.
-                        </div>
-                      )}
-                      {ruleAnalysisError && (
-                        <div style={{ marginTop: SPACING.sm, fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.negative }}>
-                          {ruleAnalysisError}
-                        </div>
-                      )}
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: SPACING.sm, alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        placeholder="New category name..."
+                        value={newCategoryName}
+                        onChange={e => setNewCategoryName(e.target.value)}
+                        onKeyDown={async e => {
+                          if (e.key === 'Enter' && newCategoryName.trim()) {
+                            setIsAddingCategory(true);
+                            try {
+                              await apiClient.createCategory(newCategoryName.trim());
+                              setNewCategoryName('');
+                              await loadCategories();
+                            } catch (err) { console.error(err); }
+                            setIsAddingCategory(false);
+                          }
+                        }}
+                        style={{
+                          padding: `${SPACING.xs}px ${SPACING.sm}px`, fontSize: TYPOGRAPHY.sizes.sm,
+                          border: `1px solid ${colors.border.default}`, borderRadius: 6,
+                          background: colors.bg.primary, color: colors.text.primary, flex: 1, maxWidth: 260,
+                        }}
+                      />
+                      <button
+                        disabled={!newCategoryName.trim() || isAddingCategory}
+                        onClick={async () => {
+                          if (!newCategoryName.trim()) return;
+                          setIsAddingCategory(true);
+                          try {
+                            await apiClient.createCategory(newCategoryName.trim());
+                            setNewCategoryName('');
+                            await loadCategories();
+                          } catch (err) { console.error(err); }
+                          setIsAddingCategory(false);
+                        }}
+                        style={{
+                          padding: `${SPACING.xs}px ${SPACING.sm}px`, fontSize: TYPOGRAPHY.sizes.sm,
+                          background: colors.primary, color: colors.bg.primary, border: 'none',
+                          borderRadius: 6, cursor: !newCategoryName.trim() || isAddingCategory ? 'not-allowed' : 'pointer',
+                          opacity: !newCategoryName.trim() || isAddingCategory ? 0.6 : 1,
+                        }}
+                      >
+                        {isAddingCategory ? 'Adding...' : '+ Add Category'}
+                      </button>
                     </div>
                   </div>
 
@@ -7711,24 +7789,6 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
                       <div style={{ display: 'flex', gap: SPACING.sm }}>
                         {!isEditingRules ? (
                           <>
-                            <button
-                              onClick={handleStartRuleAnalysis}
-                              disabled={isStartingRuleAnalysis || (ruleAnalysisRun?.status === 'queued' || ruleAnalysisRun?.status === 'running')}
-                              style={{
-                                padding: `${SPACING.xs}px ${SPACING.sm}px`,
-                                fontSize: TYPOGRAPHY.sizes.sm,
-                                background: colors.bg.primary,
-                                color: colors.primary,
-                                border: `1px solid ${colors.primary}`,
-                                borderRadius: 4,
-                                cursor: isStartingRuleAnalysis || (ruleAnalysisRun?.status === 'queued' || ruleAnalysisRun?.status === 'running') ? 'not-allowed' : 'pointer',
-                                opacity: isStartingRuleAnalysis || (ruleAnalysisRun?.status === 'queued' || ruleAnalysisRun?.status === 'running') ? 0.6 : 1,
-                              }}
-                            >
-                              {isStartingRuleAnalysis || (ruleAnalysisRun?.status === 'queued' || ruleAnalysisRun?.status === 'running')
-                                ? 'Analyzing...'
-                                : 'Analyze Rules'}
-                            </button>
                             <button
                               onClick={() => {
                                 setIsAddingRule(true);
@@ -7868,7 +7928,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
                               }}
                             >
                               <option value="">Select category...</option>
-                              {SPENDING_CATEGORIES.map(cat => (
+                              {spendingCategories.map(cat => (
                                 <option key={cat} value={cat}>{cat}</option>
                               ))}
                             </select>
@@ -8026,7 +8086,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
                             {preferencesData.categorization_rules.map((rule, idx) => {
                               const edited = editedRules[rule.id];
                               const ruleCategory = (isEditingRules ? edited?.category : rule.rule?.category) || '';
-                              const isCategoryInvalid = !isEditingRules && ruleCategory && !SPENDING_CATEGORIES.includes(ruleCategory as any);
+                              const isCategoryInvalid = !isEditingRules && ruleCategory && !spendingCategories.includes(ruleCategory as any);
                               return (
                               <tr
                                 key={rule.id}
@@ -8085,7 +8145,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
                                         }}
                                       >
                                         <option value="">Select category...</option>
-                                        {SPENDING_CATEGORIES.map(cat => (
+                                        {spendingCategories.map(cat => (
                                           <option key={cat} value={cat}>{cat}</option>
                                         ))}
                                       </select>

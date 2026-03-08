@@ -29,7 +29,12 @@ from app.tools.fetch_preferences import fetch_preferences_handler
 from app.tools.save_preferences import save_preferences_handler
 from app.tools.mutate_categories import mutate_categories_handler
 from app.tools.save_budget import save_budget_handler
-from app.tools.category_helpers import MANUAL_REVIEW, PREDEFINED_CATEGORIES, normalize_category
+from app.tools.category_helpers import (
+    MANUAL_REVIEW,
+    PREDEFINED_CATEGORIES,
+    get_all_categories,
+    normalize_category,
+)
 from app.services.llm_service import get_effective_llm_provider, get_llm_status, normalize_llm_provider
 from app.services.ollama_service import categorize_transactions_batch
 from app.services.review_service import review_transactions_batch
@@ -63,6 +68,7 @@ from app.database import (
     Transaction,
     CategorizationPreference,
     Budget,
+    CustomCategory,
     RuleAnalysisRun,
     RuleAnalysisFinding,
     get_or_create_test_user,
@@ -3122,8 +3128,110 @@ async def delete_budgets_bulk(request: Request) -> JSONResponse:
 
 @app.get("/api/categories")
 async def get_categories(request: Request) -> JSONResponse:
-    """Return the list of valid spending categories (excludes MANUAL_REVIEW)."""
-    return JSONResponse({"categories": PREDEFINED_CATEGORIES})
+    """Return predefined + user custom categories (excludes MANUAL_REVIEW)."""
+    try:
+        user_id = await resolve_request_user_id(request, require_auth=True)
+        db = SessionLocal()
+        try:
+            custom_rows = (
+                db.query(CustomCategory)
+                .filter(CustomCategory.user_id == user_id)
+                .order_by(CustomCategory.name)
+                .all()
+            )
+            custom = [
+                {"id": str(row.id), "name": row.name, "is_custom": True}
+                for row in custom_rows
+            ]
+        finally:
+            db.close()
+        predefined = [
+            {"id": None, "name": cat, "is_custom": False}
+            for cat in PREDEFINED_CATEGORIES
+        ]
+        return JSONResponse({
+            "categories": PREDEFINED_CATEGORIES + [row.name for row in custom_rows],
+            "categories_detail": predefined + custom,
+        })
+    except Exception as e:
+        logger.error("Get categories error", {"error": str(e)})
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.post("/api/categories")
+async def create_custom_category(request: Request) -> JSONResponse:
+    """Create a user-defined custom category."""
+    try:
+        user_id = await resolve_request_user_id(request, require_auth=True)
+        data = await request.json()
+        name = str(data.get("name") or "").strip()
+        if not name or len(name) > 100:
+            return JSONResponse(
+                {"error": "Category name is required and must be <=100 chars"},
+                status_code=400,
+            )
+        for predefined in PREDEFINED_CATEGORIES:
+            if name.lower() == predefined.lower():
+                return JSONResponse(
+                    {"error": f"'{name}' already exists as a built-in category"},
+                    status_code=409,
+                )
+        db = SessionLocal()
+        try:
+            existing = (
+                db.query(CustomCategory)
+                .filter(
+                    CustomCategory.user_id == user_id,
+                    CustomCategory.name == name,
+                )
+                .first()
+            )
+            if existing:
+                return JSONResponse(
+                    {"error": f"Custom category '{name}' already exists"},
+                    status_code=409,
+                )
+            cat = CustomCategory(user_id=user_id, name=name)
+            db.add(cat)
+            db.commit()
+            db.refresh(cat)
+            return JSONResponse({
+                "id": str(cat.id),
+                "name": cat.name,
+                "is_custom": True,
+            }, status_code=201)
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error("Create custom category error", {"error": str(e)})
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.delete("/api/categories/{category_id}")
+async def delete_custom_category(request: Request, category_id: str) -> JSONResponse:
+    """Delete a user-defined custom category."""
+    try:
+        user_id = await resolve_request_user_id(request, require_auth=True)
+        db = SessionLocal()
+        try:
+            cat = (
+                db.query(CustomCategory)
+                .filter(
+                    CustomCategory.id == category_id,
+                    CustomCategory.user_id == user_id,
+                )
+                .first()
+            )
+            if not cat:
+                return JSONResponse({"error": "Custom category not found"}, status_code=404)
+            db.delete(cat)
+            db.commit()
+            return JSONResponse({"deleted": True, "id": category_id})
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error("Delete custom category error", {"error": str(e)})
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 @app.get("/{full_path:path}", response_model=None)

@@ -371,16 +371,6 @@ class ApiClient {
     return this.request(`/api/rules/analyze/${runId}/findings${qs}`);
   }
 
-  async applyRuleAnalysisFinding(findingId: string): Promise<{
-    finding_id: string;
-    status: string;
-    result: Record<string, any>;
-  }>;
-  async applyRuleAnalysisFinding(findingId: string, data: { chosen_category?: string }): Promise<{
-    finding_id: string;
-    status: string;
-    result: Record<string, any>;
-  }>;
   async applyRuleAnalysisFinding(
     findingId: string,
     data?: {
@@ -411,8 +401,24 @@ class ApiClient {
     return this.request('/api/preferences/cleanup-rules', { method: 'POST' });
   }
 
-  async getCategories(): Promise<{ categories: string[] }> {
+  async getCategories(): Promise<{
+    categories: string[];
+    categories_detail: { id: string | null; name: string; is_custom: boolean }[];
+  }> {
     return this.request('/api/categories');
+  }
+
+  async createCategory(name: string): Promise<{ id: string; name: string; is_custom: boolean }> {
+    return this.request('/api/categories', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+  }
+
+  async deleteCategory(categoryId: string): Promise<{ deleted: boolean; id: string }> {
+    return this.request(`/api/categories/${categoryId}`, {
+      method: 'DELETE',
+    });
   }
 
   async getTransactionReviewQueue(

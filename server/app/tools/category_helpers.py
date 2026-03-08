@@ -8,6 +8,10 @@ Used by:
 - API handlers for category validation
 """
 
+from __future__ import annotations
+
+from typing import List, Optional, Sequence
+
 MANUAL_REVIEW = "MANUAL_REVIEW"
 
 # Predefined category options (spending categories only)
@@ -61,8 +65,36 @@ CATEGORY_SYNONYMS = {
 }
 
 
-def normalize_category(category: str) -> str | None:
-    """Normalize category strings to canonical names, including MANUAL_REVIEW."""
+def get_custom_categories(user_id: str) -> List[str]:
+    """Fetch user-defined custom category names from the database."""
+    from app.database import CustomCategory, SessionLocal
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(CustomCategory)
+            .filter(CustomCategory.user_id == user_id)
+            .order_by(CustomCategory.name)
+            .all()
+        )
+        return [row.name for row in rows]
+    finally:
+        db.close()
+
+
+def get_all_categories(user_id: Optional[str] = None) -> List[str]:
+    """Return predefined + user's custom categories (excludes MANUAL_REVIEW)."""
+    custom = get_custom_categories(user_id) if user_id else []
+    return PREDEFINED_CATEGORIES + custom
+
+
+def normalize_category(
+    category: str,
+    custom_categories: Optional[Sequence[str]] = None,
+) -> str | None:
+    """Normalize category strings to canonical names, including MANUAL_REVIEW.
+
+    If *custom_categories* is provided, also accepts those names as valid.
+    """
     if not category or not isinstance(category, str):
         return None
     cleaned = category.strip()
@@ -76,9 +108,16 @@ def normalize_category(category: str) -> str | None:
     synonym = CATEGORY_SYNONYMS.get(cleaned.lower())
     if synonym:
         return synonym
+    if custom_categories:
+        for custom in custom_categories:
+            if cleaned.lower() == custom.lower():
+                return custom
     return None
 
 
-def is_valid_category(category: str) -> bool:
+def is_valid_category(
+    category: str,
+    custom_categories: Optional[Sequence[str]] = None,
+) -> bool:
     """Return True if category is a known canonical category (including MANUAL_REVIEW)."""
-    return normalize_category(category) is not None
+    return normalize_category(category, custom_categories=custom_categories) is not None

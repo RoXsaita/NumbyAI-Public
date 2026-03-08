@@ -55,6 +55,7 @@ class User(Base):
     transactions = relationship("Transaction", back_populates="user", cascade="all, delete-orphan")
     rule_analysis_runs = relationship("RuleAnalysisRun", back_populates="user", cascade="all, delete-orphan")
     rule_analysis_findings = relationship("RuleAnalysisFinding", back_populates="user", cascade="all, delete-orphan")
+    custom_categories = relationship("CustomCategory", back_populates="user", cascade="all, delete-orphan")
 
 
 class CategorizationPreference(Base):
@@ -198,6 +199,24 @@ class RuleAnalysisFinding(Base):
     __table_args__ = (
         Index("idx_rule_analysis_findings_run_status", "run_id", "status"),
         Index("idx_rule_analysis_findings_user_status_created", "user_id", "status", "created_at"),
+    )
+
+
+class CustomCategory(Base):
+    """User-defined custom spending categories."""
+
+    __tablename__ = "custom_categories"
+
+    id = UUIDColumn()
+    user_id = UUIDForeignKey("users.id")
+    name = Column(String(100), nullable=False)
+    created_at = Column(DateTime, default=_utc_now, nullable=False)
+
+    user = relationship("User", back_populates="custom_categories")
+
+    __table_args__ = (
+        Index("idx_custom_categories_user", "user_id"),
+        Index("idx_custom_categories_user_name", "user_id", "name", unique=True),
     )
 
 
