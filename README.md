@@ -1,5 +1,7 @@
 # NumbyAI
 
+![Python Quality](https://github.com/RoXsaita/NumbyAI-Public/actions/workflows/python-quality.yml/badge.svg)
+
 **Local-first AI finance categorizer. Your bank data never leaves your machine.**
 
 Upload any bank statement CSV and NumbyAI automatically detects the format, categorizes every transaction using a local LLM (Ollama), and surfaces patterns across months. No cloud. No subscriptions. No data sharing.
@@ -250,6 +252,23 @@ No separate dev server — FastAPI serves the built frontend as static files.
 ---
 
 ## Deployment
+
+### Docker Compose (quickest)
+
+```bash
+# 1. Build the frontend first
+cd web && npm install && npm run build && cd ..
+
+# 2. Start the app + Ollama
+docker-compose up
+
+# 3. Pull the model inside the Ollama container (first run only)
+docker-compose exec ollama ollama pull qwen3.5:9b
+```
+
+App runs at **http://localhost:8000**. Data is persisted in Docker volumes (`sqlite_data`, `ollama_data`).
+
+### Production (PostgreSQL)
 
 A `Dockerfile` and `railway.toml` are included. For production:
 
