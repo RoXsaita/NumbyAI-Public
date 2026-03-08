@@ -2706,8 +2706,21 @@ export const SimpleUpload: React.FC = () => {
                 color: '#374151',
                 marginBottom: '8px',
               }}>
-                Currency {uploadResult?.currency_detected && `(Detected: ${uploadResult.currency_detected})`}
+                Functional Currency {uploadResult?.currency_detected && `(Detected: ${uploadResult.currency_detected})`}
               </label>
+              <div style={{
+                backgroundColor: '#f0f9ff',
+                border: '1px solid #bae6fd',
+                borderRadius: '8px',
+                padding: '12px 14px',
+                marginBottom: '16px',
+                fontSize: '13px',
+                color: '#0c4a6e',
+                lineHeight: '1.5',
+              }}>
+                <strong>Your functional currency</strong> is the main currency you transact in — the one the dashboard displays everything in.
+                {' '}NumbyAI supports statements in any currency, but all amounts are converted to your functional currency (at that month's average exchange rate) so your dashboard totals stay consistent.
+              </div>
               <select
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
