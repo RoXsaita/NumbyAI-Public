@@ -35,7 +35,7 @@ _CURRENCY_SYMBOLS: Dict[str, str] = {
     '$': 'USD', '€': 'EUR', '£': 'GBP', '¥': 'JPY', 'zł': 'PLN', '₹': 'INR',
     '₽': 'RUB', '₩': 'KRW', '₪': 'ILS', '₺': 'TRY', '₴': 'UAH', '₿': 'BTC',
     'د.إ': 'AED', 'ر.س': 'SAR', 'ج.م': 'EGP', 'د.ك': 'KWD', 'ر.ع': 'OMR',
-    'د.ب': 'BHD', 'ر.ق': 'QAR', 'CHF': 'CHF',
+    'د.ب': 'BHD', 'ر.ق': 'QAR', 'د.ا': 'JOD', 'CHF': 'CHF',
 }
 
 _CURRENCY_CODES: List[str] = [
