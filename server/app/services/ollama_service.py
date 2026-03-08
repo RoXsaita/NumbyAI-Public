@@ -20,7 +20,7 @@ logger = create_logger("ollama_service")
 
 
 # ---------------------------------------------------------------------------
-# Prompt building & validation (copied verbatim from cursor_agent_service)
+# Prompt building & validation
 # ---------------------------------------------------------------------------
 
 def _build_categorization_prompt(

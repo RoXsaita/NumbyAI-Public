@@ -64,12 +64,12 @@ describe('ApiClient statement processing provider override', () => {
       undefined,
       undefined,
       undefined,
-      'cursor_cli',
+      'ollama',
     );
 
     const [, requestInit] = fetchMock.mock.calls[0];
     const formData = requestInit.body as FormData;
-    expect(formData.get('llm_provider')).toBe('cursor_cli');
+    expect(formData.get('llm_provider')).toBe('ollama');
   });
 
   test('omits llm_provider when the UI passes null for the default option', async () => {

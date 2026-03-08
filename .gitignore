@@ -1,6 +1,8 @@
 # Python
 __pycache__/
 *.py[cod]
+.mypy_cache/
+.ruff_cache/
 *$py.class
 *.so
 .Python
@@ -34,6 +36,9 @@ yarn-error.log*
 .idea/
 .cursor/
 .claude/
+
+# AI assistant instructions (local-only)
+CLAUDE.md
 *.swp
 *.swo
 *~

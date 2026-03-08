@@ -45,7 +45,7 @@ export interface Preferences {
   parsing?: any[];
 }
 
-export type StatementLlmProvider = 'ollama' | 'cursor_cli';
+export type StatementLlmProvider = 'ollama';
 
 export interface ReviewTransaction {
   id: string;

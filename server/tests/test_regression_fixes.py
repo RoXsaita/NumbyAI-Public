@@ -3,7 +3,6 @@
 
 import asyncio
 import json
-import subprocess
 import sys
 import unittest
 from datetime import date, datetime, timedelta, timezone
@@ -106,49 +105,6 @@ class OllamaAvailabilityTests(unittest.TestCase):
 
         self.assertTrue(status["model_available"])
         self.assertTrue(status["available"])
-
-
-class CursorCliProviderTests(unittest.TestCase):
-    def test_cursor_cli_status_detects_configured_model(self):
-        completed = subprocess.CompletedProcess(
-            args=["agent", "models"],
-            returncode=0,
-            stdout="gpt-5.3-codex-spark-preview\ngpt-5.3-codex-high\n",
-            stderr="",
-        )
-        with patch.object(llm_service.settings, "llm_model", "gpt-5.3-codex-spark-preview"), patch(
-            "app.services.llm_service.subprocess.run", return_value=completed
-        ):
-            status = llm_service.get_cursor_cli_status()
-
-        self.assertTrue(status["reachable"])
-        self.assertTrue(status["model_available"])
-        self.assertTrue(status["available"])
-
-    def test_cursor_cli_call_extracts_fenced_json_array(self):
-        completed = subprocess.CompletedProcess(
-            args=["agent"],
-            returncode=0,
-            stdout='```json\n[{"id": 1, "category": "Shopping"}]\n```\n',
-            stderr="",
-        )
-        schema = {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "id": {"type": "integer"},
-                    "category": {"type": "string"},
-                },
-                "required": ["id", "category"],
-            },
-        }
-        with patch.object(llm_service.settings, "llm_provider", "cursor_cli"), patch.object(
-            llm_service.settings, "llm_model", "gpt-5.3-codex-spark-preview"
-        ), patch("app.services.llm_service.subprocess.run", return_value=completed):
-            response = llm_service.call_llm_json_array("Classify this", schema)
-
-        self.assertEqual(response, [{"id": 1, "category": "Shopping"}])
 
 
 class ParsingPreferenceRegressionTests(unittest.TestCase):
@@ -283,48 +239,6 @@ class LlmProviderSelectionRegressionTests(unittest.TestCase):
 
         self.assertEqual(status["provider"], "ollama")
         self.assertTrue(status["available"])
-
-    def test_provider_alias_routes_calls_through_single_config_switch(self):
-        schema = {"type": "array", "items": {"type": "object"}}
-        with patch.object(llm_service.settings, "llm_provider", "cursor-cli"), patch(
-            "app.services.llm_service._call_cursor_cli_json_array",
-            return_value=[{"id": 1}],
-        ) as mock_cursor, patch(
-            "app.services.llm_service._call_ollama_json_array"
-        ) as mock_ollama:
-            result = llm_service.call_llm_json_array("Prompt", schema)
-
-        self.assertEqual(result, [{"id": 1}])
-        mock_cursor.assert_called_once_with("Prompt", schema)
-        mock_ollama.assert_not_called()
-
-    @patch("app.services.llm_service.requests.get")
-    def test_local_override_uses_ollama_even_when_configured_provider_is_cursor(self, mock_get):
-        mock_get.return_value = _MockResponse(
-            {"models": [{"name": "qwen3.5:9b"}]}
-        )
-        with patch.object(llm_service.settings, "llm_provider", "cursor_cli"), patch.object(
-            llm_service.settings, "ollama_model", "qwen3.5:9b"
-        ):
-            status = llm_service.get_llm_status(provider_override="local")
-
-        self.assertEqual(status["provider"], "ollama")
-        self.assertTrue(status["available"])
-
-    def test_cloud_override_routes_calls_to_cursor(self):
-        schema = {"type": "array", "items": {"type": "object"}}
-        with patch.object(llm_service.settings, "llm_provider", "ollama"), patch(
-            "app.services.llm_service._call_cursor_cli_json_array",
-            return_value=[{"id": 1}],
-        ) as mock_cursor, patch(
-            "app.services.llm_service._call_ollama_json_array"
-        ) as mock_ollama:
-            result = llm_service.call_llm_json_array("Prompt", schema, provider_override="cloud")
-
-        self.assertEqual(result, [{"id": 1}])
-        mock_cursor.assert_called_once_with("Prompt", schema)
-        mock_ollama.assert_not_called()
-
 
 class E2ECategorizationReportTests(unittest.TestCase):
     def test_report_fails_when_category_breakdown_unavailable(self):
@@ -686,7 +600,7 @@ class ReviewScopeRegressionTests(unittest.TestCase):
         mock_parse_csv.return_value = parsed_rows
         mock_normalize_transaction.side_effect = lambda tx, _schema: tx
         mock_apply_rules.return_value = ({}, [{**parsed_rows[0], "id": 1}])
-        mock_get_llm_status.return_value = {"provider": "cursor_cli", "available": True}
+        mock_get_llm_status.return_value = {"provider": "ollama", "available": True}
         mock_categorize_batch.return_value = [{"id": 1, "category": "Shopping"}]
         mock_review_batch.return_value = [{"id": 1, "status": "confirmed"}]
 
@@ -701,13 +615,13 @@ class ReviewScopeRegressionTests(unittest.TestCase):
                     header_mapping=None,
                     user_id=user_id,
                     dry_run=True,
-                    llm_provider="cursor_cli",
+                    llm_provider="ollama",
                 )
             )
 
-        self.assertEqual(mock_get_llm_status.call_args.kwargs["provider_override"], "cursor_cli")
-        self.assertEqual(mock_categorize_batch.call_args.kwargs["llm_provider"], "cursor_cli")
-        self.assertEqual(mock_review_batch.call_args.kwargs["llm_provider"], "cursor_cli")
+        self.assertEqual(mock_get_llm_status.call_args.kwargs["provider_override"], "ollama")
+        self.assertEqual(mock_categorize_batch.call_args.kwargs["llm_provider"], "ollama")
+        self.assertEqual(mock_review_batch.call_args.kwargs["llm_provider"], "ollama")
 
 
 class LowValueManualReviewRegressionTests(unittest.TestCase):

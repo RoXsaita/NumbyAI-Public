@@ -54,12 +54,6 @@ const STATEMENT_LLM_OPTIONS: Array<{
     subtitle: 'Ollama',
     description: 'Runs statement categorization on your local Ollama setup.',
   },
-  {
-    value: 'cursor_cli',
-    label: 'Cloud',
-    subtitle: 'Cursor',
-    description: 'Routes statement categorization through Cursor for now.',
-  },
 ];
 
 // Helper function to convert column index to Excel-style letter (A, B, C... AA, AB, etc.)

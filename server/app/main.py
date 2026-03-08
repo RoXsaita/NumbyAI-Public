@@ -380,11 +380,11 @@ def _parse_requested_llm_provider(raw_value: Any) -> Optional[str]:
         return None
 
     normalized = normalize_llm_provider(raw_text)
-    if normalized in {"ollama", "cursor_cli"}:
+    if normalized == "ollama":
         return normalized
 
     raise ValueError(
-        "Invalid llm_provider. Use one of: ollama, cursor_cli, local, cloud."
+        "Invalid llm_provider. Supported value: 'ollama'."
     )
 
 
