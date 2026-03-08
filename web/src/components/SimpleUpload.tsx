@@ -204,7 +204,7 @@ export const SimpleUpload: React.FC = () => {
 
   useEffect(() => {
     if (autoScroll && logContainerRef.current) {
-      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+      logContainerRef.current.scrollTop = 0;
     }
   }, [eventLog, autoScroll]);
 
@@ -860,8 +860,8 @@ export const SimpleUpload: React.FC = () => {
       await apiClient.saveCurrency(currency);
       setUserCurrency(currency);
 
-      // Return to main screen after saving currency
-      setStep('file_upload');
+      // Continue to next step instead of returning to upload
+      await handleMainScreenContinue();
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to save currency'));
     }
@@ -1730,327 +1730,433 @@ export const SimpleUpload: React.FC = () => {
       ? Math.round((aiDisplayedTransactions / aiTotalTransactions) * 100)
       : aiConfirmedPct;
 
-    const LEVEL_STYLES: Record<string, { bg: string; text: string; dot: string; label: string }> = {
-      info: { bg: '#eff6ff', text: '#1d4ed8', dot: '#3b82f6', label: 'Info' },
-      success: { bg: '#ecfdf3', text: '#047857', dot: '#10b981', label: 'Success' },
-      warning: { bg: '#fffbeb', text: '#b45309', dot: '#f59e0b', label: 'Warning' },
-      error: { bg: '#fef2f2', text: '#b91c1c', dot: '#ef4444', label: 'Error' },
-    };
+    const CATEGORY_COLORS = [
+      '#dc2626', '#ef4444', '#b91c1c', '#f87171',
+      '#991b1b', '#fca5a5', '#7f1d1d', '#fee2e2',
+    ];
+
+    const reversedLog = [...eventLog].reverse();
 
     return (
       <div style={{
         minHeight: '100vh',
-        background: 'radial-gradient(circle at 10% 10%, #eef2ff 0%, #f8fafc 38%, #eef6ff 100%)',
+        background: '#fafafa',
         padding: '24px 24px 48px',
       }}>
         <style>{`
-          @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-          @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-          @keyframes fadeInUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+          @keyframes proc-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+          @keyframes proc-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+          @keyframes proc-slideDown {
+            from { opacity: 0; transform: translateY(-12px); max-height: 0; }
+            to { opacity: 1; transform: translateY(0); max-height: 120px; }
+          }
+          @keyframes proc-fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+          @keyframes proc-progressShimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+          }
+          @keyframes proc-scaleIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+          }
 
-          .processing-shell {
+          .proc-shell {
             max-width: 1200px;
             margin: 0 auto;
+            animation: proc-fadeIn 0.4s ease-out;
           }
-          .processing-kpis {
+          .proc-kpis {
             display: grid;
             grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: 12px;
             margin-bottom: 16px;
           }
-          .processing-grid {
+          .proc-grid {
             display: grid;
-            grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+            grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
             gap: 16px;
             align-items: start;
           }
-          .processing-col {
+          .proc-col {
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 14px;
           }
-          .processing-card {
-            background: rgba(255, 255, 255, 0.85);
-            border: 1px solid rgba(226, 232, 240, 0.9);
-            border-radius: 16px;
-            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
-            backdrop-filter: blur(4px);
+          .proc-card {
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+            border-radius: 14px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 6px 16px rgba(0, 0, 0, 0.02);
+            transition: box-shadow 0.2s ease;
+          }
+          .proc-card:hover {
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.04);
+          }
+          .proc-kpi-card {
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+            border-radius: 14px;
+            padding: 16px 18px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+          }
+          .proc-kpi-card:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+          }
+          .proc-feed-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+            animation: proc-slideDown 0.25s ease-out;
+            transition: background-color 0.15s ease;
+          }
+          .proc-feed-item:hover {
+            background-color: rgba(0, 0, 0, 0.015);
+          }
+          .proc-feed-item:last-child {
+            border-bottom: none;
+          }
+          .proc-progress-bar {
+            position: relative;
+            height: 6px;
+            border-radius: 999px;
+            overflow: hidden;
+          }
+          .proc-progress-bar-shimmer {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%);
+            background-size: 200% 100%;
+            animation: proc-progressShimmer 1.5s ease-in-out infinite;
+          }
+          .proc-stat-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            background: rgba(0, 0, 0, 0.03);
+            color: #525252;
           }
           @media (max-width: 1024px) {
-            .processing-grid {
+            .proc-grid {
               grid-template-columns: minmax(0, 1fr);
             }
           }
           @media (max-width: 720px) {
-            .processing-kpis {
+            .proc-kpis {
               grid-template-columns: repeat(2, minmax(0, 1fr));
             }
           }
         `}</style>
-        <div className="processing-shell">
+        <div className="proc-shell">
+          {/* Header */}
           <div
-            className="processing-card"
+            className="proc-card"
             style={{
-              padding: '20px',
+              padding: '24px',
               marginBottom: '16px',
-              background: 'linear-gradient(135deg, rgba(15,23,42,0.96) 0%, rgba(30,41,59,0.96) 58%, rgba(17,94,89,0.92) 100%)',
-              color: '#e2e8f0',
-              border: '1px solid rgba(71, 85, 105, 0.6)',
+              background: '#000000',
+              color: '#ffffff',
+              border: 'none',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
               <div style={{
-                width: '36px',
-                height: '36px',
-                border: '3px solid rgba(148,163,184,0.25)',
-                borderTop: '3px solid #22d3ee',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite',
+                width: '40px',
+                height: '40px',
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, #dc2626, #ef4444)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 flexShrink: 0,
-              }} />
-              <div style={{ flex: 1, minWidth: '240px' }}>
-                <h2 style={{ margin: 0, fontSize: '23px', fontWeight: 700, letterSpacing: '-0.2px' }}>
+              }}>
+                <div style={{
+                  width: '18px',
+                  height: '18px',
+                  border: '2.5px solid rgba(255,255,255,0.3)',
+                  borderTop: '2.5px solid #ffffff',
+                  borderRadius: '50%',
+                  animation: 'proc-spin 0.8s linear infinite',
+                }} />
+              </div>
+              <div style={{ flex: 1, minWidth: '200px' }}>
+                <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, letterSpacing: '-0.3px' }}>
                   Processing your statement
                 </h2>
-                <p style={{ margin: '6px 0 0', fontSize: '14px', color: '#cbd5e1' }}>
-                  {processingProgress || activeStep?.label || 'Initializing pipeline'}
+                <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>
+                  {processingProgress || activeStep?.label || 'Initializing...'}
                 </p>
               </div>
               <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 12px',
-                borderRadius: '999px',
-                backgroundColor: 'rgba(148, 163, 184, 0.16)',
-                border: '1px solid rgba(148,163,184,0.32)',
-                fontSize: '12px',
+                padding: '6px 14px',
+                borderRadius: '8px',
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                fontSize: '13px',
                 fontWeight: 600,
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
+                fontVariantNumeric: 'tabular-nums',
+                color: 'rgba(255,255,255,0.8)',
               }}>
-                Runtime {formatElapsed(elapsed)}
+                {formatElapsed(elapsed)}
               </div>
             </div>
-            <div style={{ marginTop: '14px', height: '8px', borderRadius: '999px', backgroundColor: 'rgba(148,163,184,0.25)', overflow: 'hidden' }}>
-              <div style={{
-                height: '100%',
-                width: `${overallProgress}%`,
-                borderRadius: '999px',
-                background: 'linear-gradient(90deg, #22d3ee 0%, #38bdf8 45%, #34d399 100%)',
-                transition: 'width 0.4s ease',
-              }} />
-            </div>
-            <div style={{ marginTop: '8px', fontSize: '12px', color: '#94a3b8' }}>
-              Pipeline completion {pipelineCompletionPct}% ({completedStepCount}/{processingSteps.length || 0} stages)
+            <div style={{ marginTop: '16px' }}>
+              <div className="proc-progress-bar" style={{ backgroundColor: 'rgba(255,255,255,0.1)', height: '6px' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${overallProgress}%`,
+                  borderRadius: '999px',
+                  background: 'linear-gradient(90deg, #dc2626 0%, #ef4444 100%)',
+                  transition: 'width 0.4s ease',
+                }} />
+                {overallProgress < 100 && <div className="proc-progress-bar-shimmer" />}
+              </div>
+              <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
+                  Step {completedStepCount} of {processingSteps.length || 0}
+                </span>
+                <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
+                  {pipelineCompletionPct}%
+                </span>
+              </div>
             </div>
           </div>
 
-          <div className="processing-kpis">
+          {/* KPI Cards */}
+          <div className="proc-kpis">
             {[
-              { label: 'Parsed', value: pipelineStats.parsed.toLocaleString(), tone: '#2563eb' },
-              { label: 'Rule matched', value: pipelineStats.ruleMatched.toLocaleString(), tone: '#7c3aed' },
-              { label: 'AI throughput', value: aiThroughput > 0 ? `${aiThroughput.toFixed(1)} tx/s` : 'Waiting', tone: '#0f766e' },
+              { label: 'Transactions', value: pipelineStats.parsed.toLocaleString(), sub: 'parsed' },
+              { label: 'Rules Applied', value: pipelineStats.ruleMatched.toLocaleString(), sub: 'matched' },
+              { label: 'AI Speed', value: aiThroughput > 0 ? `${aiThroughput.toFixed(1)}/s` : '--', sub: 'transactions' },
               {
-                label: 'AI progress',
-                value: aiTotalTransactions > 0 ? `${aiDisplayedPct}%` : 'Queued',
-                tone: aiDisplayedPct >= 100 ? '#047857' : '#0ea5e9',
+                label: 'AI Progress',
+                value: aiTotalTransactions > 0 ? `${aiDisplayedPct}%` : '--',
+                sub: aiTotalTransactions > 0 ? `${aiConfirmedTransactions} of ${aiTotalTransactions}` : 'queued',
               },
             ].map((item) => (
-              <div key={item.label} className="processing-card" style={{ padding: '14px 16px' }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              <div key={item.label} className="proc-kpi-card">
+                <div style={{ fontSize: '11px', fontWeight: 600, color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
                   {item.label}
                 </div>
-                <div style={{ marginTop: '6px', fontSize: '22px', fontWeight: 700, color: item.tone }}>
+                <div style={{ marginTop: '8px', fontSize: '28px', fontWeight: 700, color: '#000000', letterSpacing: '-0.5px', lineHeight: 1 }}>
                   {item.value}
+                </div>
+                <div style={{ marginTop: '4px', fontSize: '11px', color: '#a3a3a3' }}>
+                  {item.sub}
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="processing-grid">
-            <div className="processing-col">
-              <div className="processing-card" style={{ padding: '18px' }}>
-                <h3 style={{ margin: '0 0 14px', fontSize: '14px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Pipeline Stages
+          <div className="proc-grid">
+            <div className="proc-col">
+              {/* Pipeline Stages */}
+              <div className="proc-card" style={{ padding: '20px' }}>
+                <h3 style={{ margin: '0 0 16px', fontSize: '13px', fontWeight: 700, color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                  Pipeline
                 </h3>
-                {processingSteps.map((s, idx) => {
-                  const isActive = s.status === 'active';
-                  const isDone = s.status === 'done';
-                  const isErr = s.status === 'error';
-                  let dotColor = '#cbd5e1';
-                  if (isDone) dotColor = '#10b981';
-                  else if (isErr) dotColor = '#ef4444';
-                  else if (isActive) dotColor = '#38bdf8';
-                  const isLast = idx === processingSteps.length - 1;
-                  return (
-                    <div key={idx} style={{ display: 'flex', gap: '12px', position: 'relative', paddingBottom: isLast ? 0 : '15px' }}>
-                      {!isLast && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  {processingSteps.map((s, idx) => {
+                    const isActive = s.status === 'active';
+                    const isDone = s.status === 'done';
+                    const isErr = s.status === 'error';
+                    const isPending = s.status === 'pending';
+                    return (
+                      <div
+                        key={idx}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          padding: '10px 12px',
+                          borderRadius: '10px',
+                          backgroundColor: isActive ? 'rgba(220, 38, 38, 0.04)' : 'transparent',
+                          transition: 'background-color 0.2s ease',
+                        }}
+                      >
                         <div style={{
-                          position: 'absolute',
-                          left: '6px',
-                          top: '14px',
-                          width: '2px',
-                          height: 'calc(100% - 8px)',
-                          backgroundColor: isDone ? '#a7f3d0' : '#e2e8f0',
-                        }} />
-                      )}
-                      <div style={{
-                        width: '14px',
-                        height: '14px',
-                        borderRadius: '50%',
-                        backgroundColor: dotColor,
-                        marginTop: '2px',
-                        flexShrink: 0,
-                        boxShadow: isActive ? '0 0 0 4px rgba(56,189,248,0.2)' : undefined,
-                        animation: isActive ? 'pulse 1.4s ease-in-out infinite' : undefined,
-                      }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '13px', fontWeight: (isDone || isActive) ? 700 : 500, color: isErr ? '#b91c1c' : '#1e293b' }}>
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          flexShrink: 0,
+                          backgroundColor: isDone ? '#000000' : isErr ? '#dc2626' : isActive ? '#dc2626' : '#f5f5f5',
+                          color: isDone ? '#ffffff' : isErr ? '#ffffff' : isActive ? '#ffffff' : '#a3a3a3',
+                          transition: 'all 0.3s ease',
+                          ...(isActive ? { animation: 'proc-pulse 1.5s ease-in-out infinite' } : {}),
+                        }}>
+                          {isDone ? '\u2713' : isErr ? '!' : idx + 1}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{
+                            fontSize: '13px',
+                            fontWeight: (isDone || isActive) ? 600 : 400,
+                            color: isPending ? '#a3a3a3' : isErr ? '#dc2626' : '#000000',
+                            transition: 'color 0.2s ease',
+                          }}>
                             {s.label}
                           </span>
-                          {(isDone || isActive) && (
-                            <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#64748b', fontWeight: 600 }}>
-                              {formatStepDuration(s)}
+                          {s.detail && (
+                            <span style={{ display: 'block', fontSize: '11px', color: '#a3a3a3', marginTop: '1px' }}>
+                              {s.detail}
                             </span>
                           )}
                         </div>
-                        {s.detail && (
-                          <p style={{ margin: '3px 0 0', fontSize: '11px', color: '#64748b', lineHeight: 1.4 }}>
-                            {s.detail}
-                          </p>
+                        {(isDone || isActive) && (
+                          <span style={{ fontSize: '11px', color: '#a3a3a3', fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>
+                            {formatStepDuration(s)}
+                          </span>
                         )}
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
 
-              <div className="processing-card" style={{ padding: '18px' }}>
-                <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  AI Batch Engine
+              {/* AI Engine */}
+              <div className="proc-card" style={{ padding: '20px' }}>
+                <h3 style={{ margin: '0 0 16px', fontSize: '13px', fontWeight: 700, color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                  AI Engine
                 </h3>
-                <div style={{ marginBottom: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '13px', color: '#0f172a', fontWeight: 700 }}>
-                      Transactions processed
+
+                {/* Main progress */}
+                <div style={{ marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '13px', color: '#000000', fontWeight: 600 }}>
+                      Categorizing transactions
                     </span>
-                    <span style={{ fontSize: '12px', color: '#334155', fontWeight: 600 }}>
+                    <span style={{ fontSize: '20px', fontWeight: 700, color: '#000000', fontVariantNumeric: 'tabular-nums' }}>
                       {aiConfirmedTransactions}/{aiTotalTransactions || 0}
                     </span>
                   </div>
-                  <div style={{ height: '8px', borderRadius: '999px', backgroundColor: '#e2e8f0', overflow: 'hidden', position: 'relative' }}>
+                  <div className="proc-progress-bar" style={{ backgroundColor: '#f5f5f5', height: '6px' }}>
                     <div style={{
+                      position: 'absolute', left: 0, top: 0,
                       width: `${aiDisplayedPct}%`,
                       height: '100%',
                       borderRadius: '999px',
-                      background: 'linear-gradient(90deg, #67e8f9 0%, #38bdf8 100%)',
-                      opacity: 0.75,
+                      backgroundColor: '#fca5a5',
                       transition: 'width 0.25s linear',
                     }} />
                     <div style={{
-                      position: 'absolute',
-                      left: 0,
-                      top: 0,
+                      position: 'absolute', left: 0, top: 0,
                       width: `${aiConfirmedPct}%`,
                       height: '100%',
                       borderRadius: '999px',
-                      background: 'linear-gradient(90deg, #0284c7 0%, #0369a1 100%)',
+                      backgroundColor: '#dc2626',
                       transition: 'width 0.25s ease-out',
                     }} />
+                    {aiConfirmedPct < 100 && aiConfirmedPct > 0 && <div className="proc-progress-bar-shimmer" />}
                   </div>
-                  <div style={{ marginTop: '6px', fontSize: '11px', color: '#64748b' }}>
-                    Confirmed {aiConfirmedPct}%{estimatedInFlightTransactions > 0 ? ` · In-flight estimate +${estimatedInFlightTransactions}` : ''}
-                  </div>
+                  {estimatedInFlightTransactions > 0 && (
+                    <div style={{ marginTop: '6px', fontSize: '11px', color: '#a3a3a3' }}>
+                      ~{estimatedInFlightTransactions} in progress
+                    </div>
+                  )}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '13px', color: '#334155', fontWeight: 600 }}>
-                    {batchTelemetry.completedBatches}/{batchTelemetry.totalBatches || 0} batches complete
-                  </span>
-                  <span style={{ fontSize: '12px', color: '#64748b' }}>
-                    {batchCompletionPct}%
-                  </span>
-                </div>
-                <div style={{ height: '7px', borderRadius: '999px', backgroundColor: '#e2e8f0', overflow: 'hidden', marginBottom: '12px' }}>
-                  <div style={{
-                    width: `${batchCompletionPct}%`,
-                    height: '100%',
-                    borderRadius: '999px',
-                    background: 'linear-gradient(90deg, #0ea5e9 0%, #22c55e 100%)',
-                    transition: 'width 0.35s ease',
-                  }} />
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  <div style={{ padding: '10px', borderRadius: '10px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Mode</div>
-                    <div style={{ marginTop: '4px', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
-                      {batchTelemetry.parallel ? 'Parallel' : 'Sequential'}
-                    </div>
-                  </div>
-                  <div style={{ padding: '10px', borderRadius: '10px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Workers</div>
-                    <div style={{ marginTop: '4px', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
-                      {batchTelemetry.workers || '-'}
-                    </div>
-                  </div>
-                  <div style={{ padding: '10px', borderRadius: '10px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>In-flight</div>
-                    <div style={{ marginTop: '4px', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
-                      {batchTelemetry.activeBatches}
-                    </div>
-                  </div>
-                  <div style={{ padding: '10px', borderRadius: '10px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Avg batch</div>
-                    <div style={{ marginTop: '4px', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
-                      {batchTelemetry.avgBatchDurationMs > 0 ? formatElapsed(batchTelemetry.avgBatchDurationMs) : '-'}
-                    </div>
-                  </div>
-                  <div style={{ padding: '10px', borderRadius: '10px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ETA</div>
-                    <div style={{ marginTop: '4px', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
-                      {batchTelemetry.etaMs && batchTelemetry.etaMs > 0 ? formatElapsed(batchTelemetry.etaMs) : 'Finishing'}
-                    </div>
-                  </div>
-                  <div style={{ padding: '10px', borderRadius: '10px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Batch health</div>
-                    <div style={{ marginTop: '4px', fontSize: '13px', fontWeight: 700, color: batchSuccessRate < 100 ? '#b45309' : '#0f172a' }}>
-                      {batchSuccessRate}%
-                    </div>
-                  </div>
-                </div>
-                {(pipelineStats.warnings > 0 || pipelineStats.errors > 0) && (
-                  <div style={{ marginTop: '12px', padding: '10px 12px', borderRadius: '10px', backgroundColor: '#fff7ed', border: '1px solid #fdba74' }}>
-                    <span style={{ fontSize: '12px', color: '#9a3412', fontWeight: 600 }}>
-                      {pipelineStats.warnings > 0 ? `${pipelineStats.warnings} warning(s)` : ''}
-                      {pipelineStats.warnings > 0 && pipelineStats.errors > 0 ? ' · ' : ''}
-                      {pipelineStats.errors > 0 ? `${pipelineStats.errors} error(s)` : ''}
+
+                {/* Batches */}
+                <div style={{ marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '12px', color: '#525252', fontWeight: 500 }}>
+                      Batch progress
                     </span>
+                    <span style={{ fontSize: '12px', color: '#525252', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                      {batchTelemetry.completedBatches}/{batchTelemetry.totalBatches || 0}
+                    </span>
+                  </div>
+                  <div className="proc-progress-bar" style={{ backgroundColor: '#f5f5f5', height: '4px' }}>
+                    <div style={{
+                      position: 'absolute', left: 0, top: 0,
+                      width: `${batchCompletionPct}%`,
+                      height: '100%',
+                      borderRadius: '999px',
+                      backgroundColor: '#000000',
+                      transition: 'width 0.35s ease',
+                    }} />
+                  </div>
+                </div>
+
+                {/* Stats grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                  {[
+                    { label: 'Mode', value: batchTelemetry.parallel ? 'Parallel' : 'Sequential' },
+                    { label: 'Workers', value: String(batchTelemetry.workers || '-') },
+                    { label: 'Active', value: String(batchTelemetry.activeBatches) },
+                    { label: 'Avg time', value: batchTelemetry.avgBatchDurationMs > 0 ? formatElapsed(batchTelemetry.avgBatchDurationMs) : '-' },
+                    { label: 'ETA', value: batchTelemetry.etaMs && batchTelemetry.etaMs > 0 ? formatElapsed(batchTelemetry.etaMs) : 'Soon' },
+                    { label: 'Health', value: `${batchSuccessRate}%` },
+                  ].map((stat) => (
+                    <div key={stat.label} style={{ padding: '8px 10px', borderRadius: '8px', backgroundColor: '#fafafa' }}>
+                      <div style={{ fontSize: '10px', color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>
+                        {stat.label}
+                      </div>
+                      <div style={{ marginTop: '2px', fontSize: '13px', fontWeight: 600, color: '#000000' }}>
+                        {stat.value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {(pipelineStats.warnings > 0 || pipelineStats.errors > 0) && (
+                  <div style={{
+                    marginTop: '12px',
+                    padding: '10px 12px',
+                    borderRadius: '10px',
+                    backgroundColor: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    fontSize: '12px',
+                    color: '#991b1b',
+                    fontWeight: 600,
+                  }}>
+                    {pipelineStats.warnings > 0 ? `${pipelineStats.warnings} warning(s)` : ''}
+                    {pipelineStats.warnings > 0 && pipelineStats.errors > 0 ? ' \u00b7 ' : ''}
+                    {pipelineStats.errors > 0 ? `${pipelineStats.errors} error(s)` : ''}
                   </div>
                 )}
               </div>
 
+              {/* Category Distribution */}
               {sortedCats.length > 0 && (
-                <div className="processing-card" style={{ padding: '18px' }}>
-                  <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Category Distribution
+                <div className="proc-card" style={{ padding: '20px' }}>
+                  <h3 style={{ margin: '0 0 14px', fontSize: '13px', fontWeight: 700, color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                    Categories
                   </h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {sortedCats.slice(0, 8).map(([cat, count]) => {
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {sortedCats.slice(0, 8).map(([cat, count], catIdx) => {
                       const pct = totalCategorized > 0 ? Math.round((count / totalCategorized) * 100) : 0;
+                      const color = CATEGORY_COLORS[catIdx % CATEGORY_COLORS.length];
                       return (
-                        <div key={cat}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
-                            <span style={{ fontSize: '12px', color: '#334155', fontWeight: 600 }}>{cat}</span>
-                            <span style={{ fontSize: '11px', color: '#64748b' }}>{count} ({pct}%)</span>
+                        <div key={cat} style={{ animation: 'proc-scaleIn 0.3s ease-out', animationFillMode: 'both', animationDelay: `${catIdx * 50}ms` }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ width: '8px', height: '8px', borderRadius: '3px', backgroundColor: color, flexShrink: 0 }} />
+                              <span style={{ fontSize: '12px', color: '#000000', fontWeight: 500 }}>{cat}</span>
+                            </div>
+                            <span style={{ fontSize: '11px', color: '#a3a3a3', fontVariantNumeric: 'tabular-nums' }}>
+                              {count}
+                            </span>
                           </div>
-                          <div style={{ height: '5px', borderRadius: '999px', backgroundColor: '#e2e8f0', overflow: 'hidden' }}>
+                          <div style={{ height: '4px', borderRadius: '999px', backgroundColor: '#f5f5f5', overflow: 'hidden' }}>
                             <div style={{
                               width: `${pct}%`,
                               height: '100%',
                               borderRadius: '999px',
-                              backgroundColor: cat === 'Other' ? '#f59e0b' : '#3b82f6',
-                              transition: 'width 0.3s ease',
+                              backgroundColor: color,
+                              transition: 'width 0.4s ease',
+                              opacity: 0.8,
                             }} />
                           </div>
                         </div>
@@ -2061,104 +2167,116 @@ export const SimpleUpload: React.FC = () => {
               )}
             </div>
 
-            <div className="processing-card" style={{ display: 'flex', flexDirection: 'column', minHeight: '620px', maxHeight: 'calc(100vh - 170px)' }}>
-              <div style={{ padding: '16px 18px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+            {/* Activity Feed — newest first */}
+            <div className="proc-card" style={{ display: 'flex', flexDirection: 'column', minHeight: '620px', maxHeight: 'calc(100vh - 170px)' }}>
+              <div style={{
+                padding: '18px 20px',
+                borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '15px', color: '#0f172a', fontWeight: 700 }}>
-                    Live Activity
+                  <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                    Activity
                   </h3>
-                  <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#64748b' }}>
-                    {eventLog.length} updates · {pipelineStats.dateRange ? `${pipelineStats.dateRange.months.length} month span` : 'Detecting date range'}
+                  <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#a3a3a3' }}>
+                    {eventLog.length} events{pipelineStats.dateRange ? ` \u00b7 ${pipelineStats.dateRange.months.length} month span` : ''}
                   </p>
                 </div>
-                {!autoScroll && (
-                  <button
-                    onClick={() => {
-                      setAutoScroll(true);
-                      if (logContainerRef.current) logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
-                    }}
-                    style={{
-                      border: '1px solid #cbd5e1',
-                      backgroundColor: '#f8fafc',
-                      color: '#334155',
-                      borderRadius: '8px',
-                      padding: '6px 10px',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Jump to latest
-                  </button>
+                {eventLog.length > 0 && (
+                  <div className="proc-stat-pill">
+                    <div style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      backgroundColor: '#dc2626',
+                      animation: 'proc-pulse 1.5s ease-in-out infinite',
+                    }} />
+                    Live
+                  </div>
                 )}
               </div>
               <div
                 ref={logContainerRef}
-                onScroll={(e) => {
-                  const el = e.currentTarget;
-                  const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 32;
-                  setAutoScroll(atBottom);
-                }}
-                style={{ flex: 1, overflow: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}
+                style={{ flex: 1, overflow: 'auto' }}
               >
                 {eventLog.length === 0 && (
                   <div style={{
-                    borderRadius: '12px',
-                    border: '1px dashed #cbd5e1',
-                    backgroundColor: '#f8fafc',
-                    padding: '16px',
+                    padding: '40px 20px',
                     textAlign: 'center',
-                    color: '#64748b',
+                    color: '#a3a3a3',
                     fontSize: '13px',
                   }}>
-                    Waiting for first processing event...
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '8px',
+                      backgroundColor: '#f5f5f5',
+                      margin: '0 auto 12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '16px',
+                    }}>
+                      ...
+                    </div>
+                    Waiting for first event
                   </div>
                 )}
-                {eventLog.map((entry, idx) => {
-                  const style = LEVEL_STYLES[entry.level] || LEVEL_STYLES.info;
+                {reversedLog.map((entry, idx) => {
+                  const isSuccess = entry.level === 'success';
+                  const isError = entry.level === 'error';
+                  const isWarning = entry.level === 'warning';
+                  const isLatest = idx === 0;
                   return (
                     <div
-                      key={idx}
+                      key={eventLog.length - 1 - idx}
+                      className="proc-feed-item"
                       style={{
-                        display: 'flex',
-                        gap: '10px',
-                        alignItems: 'flex-start',
-                        borderRadius: '12px',
-                        border: '1px solid #e2e8f0',
-                        backgroundColor: '#ffffff',
-                        padding: '10px 12px',
-                        animation: 'fadeInUp 0.2s ease-out',
+                        ...(isLatest ? { animation: 'proc-slideDown 0.25s ease-out' } : {}),
                       }}
                     >
-                      <span style={{
-                        marginTop: '2px',
-                        width: '10px',
-                        height: '10px',
-                        borderRadius: '50%',
-                        backgroundColor: style.dot,
-                        flexShrink: 0,
-                      }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px', flexWrap: 'wrap' }}>
-                          <span style={{
-                            padding: '2px 8px',
-                            borderRadius: '999px',
-                            backgroundColor: style.bg,
-                            color: style.text,
-                            fontSize: '11px',
-                            fontWeight: 700,
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.4px',
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                        <div style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '13px',
+                          flexShrink: 0,
+                          marginTop: '1px',
+                          backgroundColor: isError ? '#fef2f2' : isWarning ? '#fffbeb' : isSuccess ? '#f0fdf4' : '#f5f5f5',
+                          color: isError ? '#dc2626' : isWarning ? '#d97706' : isSuccess ? '#16a34a' : '#525252',
+                        }}>
+                          {isSuccess ? '\u2713' : isError ? '\u2717' : isWarning ? '!' : '\u2022'}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{
+                            margin: 0,
+                            fontSize: '13px',
+                            color: '#000000',
+                            lineHeight: 1.5,
+                            wordBreak: 'break-word',
+                            fontWeight: isLatest ? 500 : 400,
                           }}>
-                            {style.label}
-                          </span>
-                          <span style={{ fontSize: '11px', color: '#64748b' }}>
-                            {(entry.elapsed_ms / 1000).toFixed(1)}s
+                            {entry.message}
+                          </p>
+                          <span style={{
+                            fontSize: '11px',
+                            color: '#a3a3a3',
+                            marginTop: '2px',
+                            display: 'inline-block',
+                            fontVariantNumeric: 'tabular-nums',
+                          }}>
+                            {entry.elapsed_ms < 1000
+                              ? `${Math.round(entry.elapsed_ms)}ms`
+                              : `${(entry.elapsed_ms / 1000).toFixed(1)}s`}
+                            {isLatest && ' ago'}
                           </span>
                         </div>
-                        <p style={{ margin: 0, fontSize: '13px', color: '#334155', lineHeight: 1.45, wordBreak: 'break-word' }}>
-                          {entry.message}
-                        </p>
                       </div>
                     </div>
                   );
@@ -2779,7 +2897,7 @@ export const SimpleUpload: React.FC = () => {
                   cursor: currency ? 'pointer' : 'not-allowed',
                 }}
               >
-                Continue
+                Set Currency & Continue
               </button>
             </div>
           )}
@@ -2799,10 +2917,10 @@ export const SimpleUpload: React.FC = () => {
                 {isAutoDetected ? (
                   <>
                     <p style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: 500 }}>
-                      We detected your column layout automatically. Please review and adjust if needed.
+                      We auto-detected your column layout. Please review and adjust if needed.
                     </p>
                     <p style={{ margin: '0', fontSize: '13px', fontWeight: 400, opacity: 0.9 }}>
-                      Columns marked with a green dot were detected with high confidence. Orange dots indicate medium confidence -- double-check those.
+                      Columns labeled <strong>Auto-detected</strong> are high-confidence. Columns labeled <strong>Check this</strong> may need your review. You can select <strong>multiple columns as Description</strong> and <strong>multiple columns as Amount</strong>.
                     </p>
                   </>
                 ) : (
@@ -2879,9 +2997,14 @@ export const SimpleUpload: React.FC = () => {
                           ? detectionConfidence[currentFieldType] || null
                           : null;
                         const isDetected = isAutoDetected && currentFieldType && currentFieldType !== 'do_not_use';
-                        const confidenceColor = fieldConfidence === 'high' ? '#10b981'
-                          : fieldConfidence === 'medium' ? '#f59e0b'
-                          : fieldConfidence === 'low' ? '#ef4444' : null;
+
+                        const confidenceBadge = fieldConfidence === 'high'
+                          ? { label: '\u2713 Auto-detected', bg: '#ecfdf5', color: '#065f46', border: '#a7f3d0' }
+                          : fieldConfidence === 'medium'
+                            ? { label: '\u26A0 Check this', bg: '#fffbeb', color: '#92400e', border: '#fde68a' }
+                            : fieldConfidence === 'low'
+                              ? { label: '? Uncertain', bg: '#fef2f2', color: '#991b1b', border: '#fecaca' }
+                              : null;
 
                         return (
                           <div key={i} style={{
@@ -2902,20 +3025,26 @@ export const SimpleUpload: React.FC = () => {
                               marginBottom: '4px',
                             }}>
                               {getColumnLetter(i)}
-                              {isDetected && confidenceColor && (
-                                <span
-                                  title={`${fieldConfidence} confidence`}
-                                  style={{
-                                    display: 'inline-block',
-                                    width: '7px',
-                                    height: '7px',
-                                    borderRadius: '50%',
-                                    backgroundColor: confidenceColor,
-                                    flexShrink: 0,
-                                  }}
-                                />
-                              )}
                             </label>
+                            {isDetected && confidenceBadge && (
+                              <span
+                                style={{
+                                  display: 'inline-block',
+                                  fontSize: '10px',
+                                  fontWeight: 600,
+                                  lineHeight: 1,
+                                  padding: '3px 6px',
+                                  borderRadius: '4px',
+                                  backgroundColor: confidenceBadge.bg,
+                                  color: confidenceBadge.color,
+                                  border: `1px solid ${confidenceBadge.border}`,
+                                  marginBottom: '4px',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {confidenceBadge.label}
+                              </span>
+                            )}
                             <select
                               value={columnMappings[i] || 'do_not_use'}
                               onChange={(e) => {
@@ -2938,8 +3067,8 @@ export const SimpleUpload: React.FC = () => {
                               style={{
                                 width: '100%',
                                 padding: '8px',
-                                border: isDetected && confidenceColor
-                                  ? `2px solid ${confidenceColor}`
+                                border: isDetected && confidenceBadge
+                                  ? `2px solid ${confidenceBadge.border}`
                                   : '1px solid #d1d5db',
                                 borderRadius: '6px',
                                 fontSize: '13px',

@@ -18,6 +18,74 @@ from app.utils import safe_emit_progress
 
 logger = create_logger("ollama_service")
 
+_DEFAULT_NUM_CTX = 32768
+_CONTEXT_BUDGET_RATIO = 0.55
+_OUTPUT_TOKENS_PER_TX = 30
+
+
+# ---------------------------------------------------------------------------
+# Token estimation & adaptive batching
+# ---------------------------------------------------------------------------
+
+def _estimate_tokens(text: str) -> int:
+    """Conservative token estimate (~3.5 chars per token for English text)."""
+    return max(1, int(len(text) / 3.5))
+
+
+def _estimate_transaction_tokens(tx: Dict) -> int:
+    """Estimate how many tokens a single transaction will consume in the prompt."""
+    serialized = json.dumps(tx, default=str)
+    return _estimate_tokens(serialized)
+
+
+def _get_token_budget() -> int:
+    """Compute the token budget available for the transaction payload.
+
+    Takes the configured context window, reserves space for prompt chrome
+    (template text, categories list, rules) and output tokens.
+    """
+    num_ctx = settings.ollama_num_ctx or _DEFAULT_NUM_CTX
+    return int(num_ctx * _CONTEXT_BUDGET_RATIO)
+
+
+def build_adaptive_batches(
+    transactions: List[Dict],
+    max_batch_size: int = 20,
+    token_budget: Optional[int] = None,
+) -> List[List[Dict]]:
+    """Split transactions into batches that respect both count and token limits.
+
+    Each batch will contain at most *max_batch_size* items **and** the
+    estimated token cost of all items in the batch will not exceed
+    *token_budget*.  A single oversized transaction still gets its own
+    batch (minimum 1 per batch).
+    """
+    if token_budget is None:
+        token_budget = _get_token_budget()
+
+    batches: List[List[Dict]] = []
+    current_batch: List[Dict] = []
+    current_tokens = 0
+
+    for tx in transactions:
+        tx_tokens = _estimate_transaction_tokens(tx)
+
+        would_exceed_tokens = current_tokens + tx_tokens > token_budget
+        would_exceed_count = len(current_batch) >= max_batch_size
+
+        if current_batch and (would_exceed_tokens or would_exceed_count):
+            batches.append(current_batch)
+            current_batch = []
+            current_tokens = 0
+
+        current_batch.append(tx)
+        current_tokens += tx_tokens
+
+    if current_batch:
+        batches.append(current_batch)
+
+    return batches
+
 
 # ---------------------------------------------------------------------------
 # Prompt building & validation
@@ -98,9 +166,7 @@ def categorize_transactions_batch(
     if not transactions:
         return []
 
-    batches = []
-    for i in range(0, len(transactions), batch_size):
-        batches.append(transactions[i : i + batch_size])
+    batches = build_adaptive_batches(transactions, max_batch_size=batch_size)
 
     def emit_progress(payload: Dict[str, Any]) -> None:
         safe_emit_progress(progress_callback, payload, logger)
@@ -109,10 +175,13 @@ def categorize_transactions_batch(
     worker_limit = max(1, worker_limit)
     worker_count = min(len(batches), worker_limit)
 
-    logger.info("Categorizing transactions", {
+    batch_sizes = [len(b) for b in batches]
+    logger.info("Categorizing transactions (adaptive batching)", {
         "total": len(transactions),
         "batches": len(batches),
-        "batch_size": batch_size,
+        "max_batch_size": batch_size,
+        "actual_batch_sizes": batch_sizes,
+        "token_budget": _get_token_budget(),
         "parallel": parallel,
         "max_workers": worker_count,
     })
@@ -121,7 +190,7 @@ def categorize_transactions_batch(
         "type": "categorization_start",
         "total_transactions": len(transactions),
         "total_batches": len(batches),
-        "batch_size": batch_size,
+        "batch_size": max(batch_sizes) if batch_sizes else batch_size,
         "parallel": parallel and len(batches) > 1,
         "max_workers": worker_count,
     })

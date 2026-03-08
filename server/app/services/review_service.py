@@ -16,6 +16,7 @@ from app.logger import create_logger
 from app.prompts import load_prompt, render_prompt
 from app.services.categorization_rules import CategorizationRule, format_rules_for_prompt
 from app.services.llm_service import call_llm_json_array, get_llm_status
+from app.services.ollama_service import build_adaptive_batches
 from app.tools.category_helpers import ALL_VALID_CATEGORIES, MANUAL_REVIEW, normalize_category
 from app.utils import safe_emit_progress
 
@@ -151,9 +152,7 @@ def review_transactions_batch(
             })
         return []
 
-    batches: List[List[Dict[str, Any]]] = []
-    for i in range(0, len(transactions), batch_size):
-        batches.append(transactions[i : i + batch_size])
+    batches = build_adaptive_batches(transactions, max_batch_size=batch_size)
 
     def emit(payload: Dict[str, Any]) -> None:
         safe_emit_progress(progress_callback, payload, logger)

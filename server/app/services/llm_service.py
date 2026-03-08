@@ -150,6 +150,14 @@ def get_llm_status(provider_override: Optional[str] = None) -> Dict[str, Any]:
     }
 
 
+def _build_ollama_options() -> Dict[str, Any]:
+    """Build the Ollama options dict from settings."""
+    opts: Dict[str, Any] = {"temperature": 0}
+    if settings.ollama_num_ctx is not None:
+        opts["num_ctx"] = settings.ollama_num_ctx
+    return opts
+
+
 def _call_ollama_json_array(prompt: str, response_schema: Dict[str, Any]) -> List[Dict[str, Any]]:
     model = settings.ollama_model
     url = f"{settings.ollama_url}{_GENERATE_ENDPOINT}"
@@ -158,7 +166,7 @@ def _call_ollama_json_array(prompt: str, response_schema: Dict[str, Any]) -> Lis
         "prompt": prompt,
         "stream": False,
         "format": response_schema,
-        "options": {"temperature": 0},
+        "options": _build_ollama_options(),
     }
     if settings.ollama_think is not None:
         payload["think"] = settings.ollama_think
@@ -223,7 +231,7 @@ def _call_ollama_json_object(prompt: str, response_schema: Dict[str, Any]) -> Di
         "prompt": prompt,
         "stream": False,
         "format": response_schema,
-        "options": {"temperature": 0},
+        "options": _build_ollama_options(),
     }
     if settings.ollama_think is not None:
         payload["think"] = settings.ollama_think

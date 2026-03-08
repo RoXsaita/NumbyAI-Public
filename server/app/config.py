@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     ollama_model: str = "qwen3.5:9b"
     # None => omit `think` option; bool => force thinking on/off.
     ollama_think: Optional[bool] = False
+    # None => use Ollama's model default (typically 32768 for qwen3.5:9b).
+    ollama_num_ctx: Optional[int] = None
     categorization_batch_size: int = 20
     categorization_max_workers: int = 5
     
