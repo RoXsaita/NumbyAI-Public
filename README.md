@@ -153,19 +153,22 @@ Dashboard
 
 ## Quick Start
 
+Works on **Windows**, **macOS**, and **Linux**. The only prerequisites are Python 3.11+, Node.js 18+, and Ollama.
+
 ```bash
 # 1. Clone
 git clone https://github.com/RoXsaita/NumbyAI-Public.git
 cd NumbyAI-Public
 
 # 2. Install Ollama and pull the default model
-make setup-ollama
+python run.py setup-ollama
 
 # 3. Copy env file
-cp server/.env.example server/.env
+cp server/.env.example server/.env          # macOS / Linux
+copy server\.env.example server\.env        # Windows (cmd)
 
-# 4. Start everything (venv, migrations, frontend build, server)
-make restart
+# 4. Start everything (venv, deps, migrations, frontend build, server)
+python run.py start
 ```
 
 App runs at **http://localhost:8000**.
@@ -201,7 +204,8 @@ NumbyAI-Public/
 │       ├── widgets/dashboard.tsx        # Main dashboard
 │       └── lib/api-client.ts
 ├── sample_bank_export.csv             # Two-month test statement with metadata preamble
-└── Makefile
+├── run.py                            # Cross-platform CLI (Windows / macOS / Linux)
+└── Makefile                          # macOS / Linux shortcut (optional)
 ```
 
 ---
@@ -224,6 +228,23 @@ All config via environment variables. See [`server/.env.example`](server/.env.ex
 
 ## Development
 
+All commands work on Windows, macOS, and Linux via `run.py`:
+
+```bash
+python run.py start          # Stop → migrate → build → start
+python run.py stop           # Kill the server
+python run.py logs           # Tail backend logs
+python run.py check          # ruff + mypy + pytest
+python run.py setup-ollama   # Install/verify Ollama + pull model
+python run.py test-e2e       # End-to-end categorization (requires Ollama)
+python run.py clear-db       # Delete the SQLite database
+```
+
+<details>
+<summary>macOS / Linux shortcut (Makefile)</summary>
+
+If you have `make` installed, the Makefile still works:
+
 ```bash
 make restart        # Stop → migrate → build → start
 make stop           # Kill all services
@@ -231,6 +252,7 @@ make logs           # Tail backend logs
 make check-python   # ruff + mypy + pytest
 make test-e2e       # End-to-end categorization (requires Ollama)
 ```
+</details>
 
 ### Run tests
 
@@ -244,10 +266,30 @@ pytest tests --cov=app --cov-report=term-missing
 ```bash
 cd web && npm install && npm run build
 # Dev mode with mock data (no backend needed):
-DATA_SOURCE=mock npm run build:dev
+npm run build:dev
 ```
 
 No separate dev server — FastAPI serves the built frontend as static files.
+
+---
+
+## Platform Notes
+
+### Windows
+
+- Use `python` instead of `python3` (Windows Python installer registers `python`).
+- Ollama: install from [ollama.com/download/windows](https://ollama.com/download/windows) or `winget install Ollama.Ollama`.
+- The `Makefile` requires GNU Make (e.g. via Git Bash or WSL) — use `run.py` instead.
+
+### Linux
+
+- Ollama: `curl -fsSL https://ollama.com/install.sh | sh`.
+- Everything else works out of the box.
+
+### macOS
+
+- Ollama: `brew install ollama`.
+- Both `run.py` and `make` work.
 
 ---
 

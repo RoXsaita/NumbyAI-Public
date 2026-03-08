@@ -1,4 +1,4 @@
-.PHONY: restart stop logs ensure-venv ensure-python-tools ensure-frontend setup-ollama test-e2e check-python
+.PHONY: restart stop logs ensure-venv ensure-python-tools ensure-frontend setup-ollama test-e2e check-python clear-db
 
 LOG_DIR ?= $(CURDIR)/server/logs
 LOG_FILE ?= $(LOG_DIR)/numbyai-backend.log
@@ -111,6 +111,9 @@ logs:
 	else \
 		echo "Log file not found: $(LOG_FILE)"; \
 	fi
+
+clear-db:		## Delete the SQLite database (run make restart to recreate)
+	@rm -f server/finance_recon.db && echo "✓ Database cleared" || echo "  No database file found"
 
 setup-ollama:		## Install Ollama and pull qwen3.5:9b
 	bash server/scripts/setup_ollama.sh

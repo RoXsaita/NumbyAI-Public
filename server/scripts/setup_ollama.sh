@@ -10,7 +10,11 @@ echo ""
 # 1. Check if ollama binary is on PATH
 if ! command -v ollama &>/dev/null; then
     echo "✗ ollama not found on PATH."
-    echo "  Install with:  brew install ollama"
+    case "$(uname -s)" in
+        Darwin) echo "  Install with:  brew install ollama" ;;
+        Linux)  echo "  Install with:  curl -fsSL https://ollama.com/install.sh | sh" ;;
+        *)      echo "  Visit https://ollama.com/download for install instructions." ;;
+    esac
     echo "  Then re-run this script."
     exit 1
 fi
