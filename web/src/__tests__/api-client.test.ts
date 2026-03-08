@@ -1,6 +1,8 @@
 import { apiClient } from '../lib/api-client';
 
-describe('ApiClient statement processing provider override', () => {
+import { apiClient } from '../lib/api-client';
+
+describe('ApiClient statement processing', () => {
   const originalFetch = global.fetch;
 
   afterEach(() => {
@@ -8,7 +10,7 @@ describe('ApiClient statement processing provider override', () => {
     jest.restoreAllMocks();
   });
 
-  test('omits llm_provider when no override is selected', async () => {
+  test('sends bank_name and file in formData', async () => {
     const fetchMock = jest.fn().mockResolvedValue({
       ok: true,
       body: {
@@ -17,7 +19,8 @@ describe('ApiClient statement processing provider override', () => {
             .fn()
             .mockResolvedValueOnce({
               done: false,
-              value: new TextEncoder().encode('data: {"type":"complete","result":{"status":"success"}}\n'),
+              value: new TextEncoder().encode('data: {"type":"complete","result":{"status":"success"}}
+'),
             })
             .mockResolvedValueOnce({ done: true, value: undefined }),
         }),
@@ -27,81 +30,16 @@ describe('ApiClient statement processing provider override', () => {
     global.fetch = fetchMock as typeof fetch;
 
     await apiClient.processStatementStream(
-      new File(['date,description,amount\n'], 'statement.csv', { type: 'text/csv' }),
+      new File(['date,description,amount
+'], 'statement.csv', { type: 'text/csv' }),
       'ProviderBank',
-      undefined,
-      undefined,
       undefined,
       undefined,
     );
 
     const [, requestInit] = fetchMock.mock.calls[0];
     const formData = requestInit.body as FormData;
-    expect(formData.get('llm_provider')).toBeNull();
-  });
-
-  test('includes llm_provider when the user selects an override', async () => {
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: true,
-      body: {
-        getReader: () => ({
-          read: jest
-            .fn()
-            .mockResolvedValueOnce({
-              done: false,
-              value: new TextEncoder().encode('data: {"type":"complete","result":{"status":"success"}}\n'),
-            })
-            .mockResolvedValueOnce({ done: true, value: undefined }),
-        }),
-      },
-      json: async () => ({ status: 'success' }),
-    });
-    global.fetch = fetchMock as typeof fetch;
-
-    await apiClient.processStatementStream(
-      new File(['date,description,amount\n'], 'statement.csv', { type: 'text/csv' }),
-      'ProviderBank',
-      undefined,
-      undefined,
-      undefined,
-      'ollama',
-    );
-
-    const [, requestInit] = fetchMock.mock.calls[0];
-    const formData = requestInit.body as FormData;
-    expect(formData.get('llm_provider')).toBe('ollama');
-  });
-
-  test('omits llm_provider when the UI passes null for the default option', async () => {
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: true,
-      body: {
-        getReader: () => ({
-          read: jest
-            .fn()
-            .mockResolvedValueOnce({
-              done: false,
-              value: new TextEncoder().encode('data: {"type":"complete","result":{"status":"success"}}\n'),
-            })
-            .mockResolvedValueOnce({ done: true, value: undefined }),
-        }),
-      },
-      json: async () => ({ status: 'success' }),
-    });
-    global.fetch = fetchMock as typeof fetch;
-
-    await apiClient.processStatementStream(
-      new File(['date,description,amount\n'], 'statement.csv', { type: 'text/csv' }),
-      'ProviderBank',
-      undefined,
-      undefined,
-      undefined,
-      null as any,
-    );
-
-    const [, requestInit] = fetchMock.mock.calls[0];
-    const formData = requestInit.body as FormData;
-    expect(formData.get('llm_provider')).toBeNull();
+    expect(formData.get('bank_name')).toBe('ProviderBank');
   });
 });
 

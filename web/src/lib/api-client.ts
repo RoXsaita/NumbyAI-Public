@@ -45,7 +45,6 @@ export interface Preferences {
   parsing?: any[];
 }
 
-export type StatementLlmProvider = 'ollama';
 
 export interface ReviewTransaction {
   id: string;
@@ -616,7 +615,6 @@ class ApiClient {
   async processStatementStream(
     file: File,
     bankName: string,
-    netFlow: number | undefined,
     headerMapping: {
       column_mappings: any;
       amount_column_inversions?: Record<string, boolean>;
@@ -627,7 +625,6 @@ class ApiClient {
       currency?: string;
     } | undefined,
     excludedTransactionRows?: number[],
-    llmProvider?: StatementLlmProvider,
     onEvent?: (event: any) => void,
     profile?: string,
     force?: boolean
@@ -643,10 +640,8 @@ class ApiClient {
       file,
       {
         bank_name: bankName,
-        net_flow: netFlow !== undefined ? netFlow.toString() : undefined,
         header_mapping: headerMapping ? JSON.stringify(headerMapping) : undefined,
         excluded_transaction_rows: excludedTransactionRows ? JSON.stringify(excludedTransactionRows) : undefined,
-        llm_provider: llmProvider,
         profile: profile || undefined,
         force: force ? 'true' : undefined,
       },

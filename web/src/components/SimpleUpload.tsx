@@ -12,7 +12,7 @@
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { apiClient, type ReviewQueueResponse, type StatementLlmProvider } from '../lib/api-client';
+import { apiClient, type ReviewQueueResponse } from '../lib/api-client';
 import { config } from '../config';
 import type { DashboardProps } from '../shared/schemas';
 import { getErrorMessage } from '../lib/utils';
@@ -23,7 +23,6 @@ type UploadStep =
   | 'currency_selection'
   | 'bank_selection'
   | 'header_mapping'
-  | 'net_flow_input'
   | 'processing'
   | 'review'
   | 'success';
@@ -36,25 +35,7 @@ const COMMON_CURRENCIES = [
   'QAR', 'KWD', 'BHD', 'OMR', 'JOD', 'EGP', 'NGN', 'KES', 'GHS', 'MAD',
 ];
 
-const STATEMENT_LLM_OPTIONS: Array<{
-  value: StatementLlmProvider | null;
-  label: string;
-  subtitle: string;
-  description: string;
-}> = [
-  {
-    value: null,
-    label: 'Default',
-    subtitle: 'Server',
-    description: 'Uses the provider configured on the backend unless you explicitly override it.',
-  },
-  {
-    value: 'ollama',
-    label: 'Local',
-    subtitle: 'Ollama',
-    description: 'Runs statement categorization on your local Ollama setup.',
-  },
-];
+
 
 // Helper function to convert column index to Excel-style letter (A, B, C... AA, AB, etc.)
 const getColumnLetter = (index: number): string => {
@@ -127,8 +108,6 @@ export const SimpleUpload: React.FC = () => {
   const [invertAmountSign, setInvertAmountSign] = useState(false);
   // Removed hasHeaders - we always use first_transaction_row instead
   const [firstTransactionRow, setFirstTransactionRow] = useState<number>(1);
-  const [netFlow, setNetFlow] = useState<string>('');
-  const [statementLlmProvider, setStatementLlmProvider] = useState<StatementLlmProvider | null>(null);
   const [mappingNetFlowPreview, setMappingNetFlowPreview] = useState<{
     transaction_count: number;
     parsed_transaction_count: number;
@@ -829,19 +808,6 @@ export const SimpleUpload: React.FC = () => {
     }
   };
 
-  const handleBankSelect = async () => {
-    const finalBankName = await validateAndAddBank();
-    if (!finalBankName) return;
-
-    // Move to next step based on whether parsing preferences exist
-    if (uploadResult?.parsing_preferences_exist) {
-      // Skip header mapping, go to net flow
-      setStep('net_flow_input');
-    } else {
-      // Need header mapping
-      setStep('header_mapping');
-    }
-  };
 
   // Validation helper: Check if a value looks like data instead of a column index
   const validateColumnReference = (columnRef: string | string[]): boolean => {
@@ -1067,7 +1033,6 @@ export const SimpleUpload: React.FC = () => {
     initializeProcessingProgress();
 
     try {
-      const netFlowValue = netFlow ? parseFloat(netFlow) : undefined;
       const mapping = uploadResult?.parsing_preferences_exist ? undefined : convertMappingsToAPI();
       const excludedRows = getSanitizedExcludedRows();
 
@@ -1075,10 +1040,8 @@ export const SimpleUpload: React.FC = () => {
       const result = await apiClient.processStatementStream(
         file,
         bankName,
-        netFlowValue,
         mapping,
         excludedRows,
-        statementLlmProvider,
         handleProcessingEvent,
         effectiveProfile || undefined,
         force
@@ -1142,8 +1105,6 @@ export const SimpleUpload: React.FC = () => {
     setInvertAmountSign(false);
     setFirstTransactionRow(1);
     setExcludedTransactionRows([]);
-    setNetFlow('');
-    setStatementLlmProvider(null);
     setMappingNetFlowPreview(null);
     setIsCalculatingMappingNetFlow(false);
     setMappingNetFlowError(null);
@@ -2539,106 +2500,20 @@ export const SimpleUpload: React.FC = () => {
                 )}
               </div>
 
-              <div style={{ marginBottom: '24px' }}>
-                <label style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: 600,
+              <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: '#6b7280' }}>Processing model:</span>
+                <span style={{
+                  fontSize: '12px',
+                  fontWeight: 700,
                   color: '#374151',
-                  marginBottom: '8px',
+                  backgroundColor: '#f3f4f6',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '6px',
+                  padding: '3px 10px',
+                  letterSpacing: '0.02em',
                 }}>
-                  Processing Model
-                </label>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                  gap: '12px',
-                }}>
-                  {STATEMENT_LLM_OPTIONS.map((option) => {
-                    const isSelected = statementLlmProvider === option.value;
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => setStatementLlmProvider(option.value)}
-                        disabled={isUploading}
-                        style={{
-                          textAlign: 'left',
-                          padding: '14px',
-                          borderRadius: '10px',
-                          border: isSelected ? '2px solid #dc2626' : '1px solid #d1d5db',
-                          backgroundColor: isSelected ? '#fef2f2' : '#ffffff',
-                          cursor: isUploading ? 'not-allowed' : 'pointer',
-                          opacity: isUploading ? 0.6 : 1,
-                        }}
-                      >
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          marginBottom: '6px',
-                          gap: '8px',
-                        }}>
-                          <span style={{
-                            fontSize: '15px',
-                            fontWeight: 700,
-                            color: isSelected ? '#b91c1c' : '#111827',
-                          }}>
-                            {option.label}
-                          </span>
-                          <span style={{
-                            fontSize: '11px',
-                            fontWeight: 700,
-                            color: isSelected ? '#b91c1c' : '#6b7280',
-                            letterSpacing: '0.04em',
-                            textTransform: 'uppercase',
-                          }}>
-                            {option.subtitle}
-                          </span>
-                        </div>
-                        <div style={{
-                          fontSize: '12px',
-                          lineHeight: 1.5,
-                          color: '#6b7280',
-                        }}>
-                          {option.description}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Net Flow Input Section */}
-              <div style={{ marginBottom: '24px' }}>
-                <label style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  color: '#374151',
-                  marginBottom: '8px',
-                }}>
-                  Net Flow (optional)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={netFlow}
-                  onChange={(e) => setNetFlow(e.target.value)}
-                  placeholder="Ending balance - Starting balance"
-                  disabled={isUploading}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    opacity: isUploading ? 0.6 : 1,
-                  }}
-                />
-                <p style={{ marginTop: '4px', fontSize: '12px', color: '#9ca3af' }}>
-                  Leave empty to auto-calculate from transactions
-                </p>
+                  Ollama · Local
+                </span>
               </div>
 
               {/* Continue Button */}
