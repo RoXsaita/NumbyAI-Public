@@ -85,8 +85,12 @@ def _tx_snapshot(tx: Transaction) -> Dict[str, Any]:
     }
 
 
+def _rule_data(rule: CategorizationRule) -> Dict[str, Any]:
+    return rule.rule if isinstance(rule.rule, dict) else {}
+
+
 def _rule_pattern(rule: CategorizationRule) -> str:
-    rule_data = rule.rule if isinstance(rule.rule, dict) else {}
+    rule_data = _rule_data(rule)
     return str(
         rule_data.get("description_pattern")
         or rule_data.get("merchant_pattern")
@@ -98,7 +102,7 @@ def _rule_pattern(rule: CategorizationRule) -> str:
 
 
 def _rule_pattern_kind(rule: CategorizationRule) -> str:
-    rule_data = rule.rule if isinstance(rule.rule, dict) else {}
+    rule_data = _rule_data(rule)
     if rule_data.get("description_pattern"):
         return "description"
     if rule_data.get("merchant_pattern"):
@@ -107,7 +111,7 @@ def _rule_pattern_kind(rule: CategorizationRule) -> str:
 
 
 def _rule_amount_bounds(rule: CategorizationRule) -> Tuple[Optional[str], Optional[str]]:
-    rule_data = rule.rule if isinstance(rule.rule, dict) else {}
+    rule_data = _rule_data(rule)
     conditions = rule_data.get("conditions") if isinstance(rule_data.get("conditions"), dict) else {}
 
     def _normalize_bound(value: Any) -> Optional[str]:

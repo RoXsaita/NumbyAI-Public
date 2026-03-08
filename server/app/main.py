@@ -3141,11 +3141,11 @@ async def get_categories(request: Request) -> JSONResponse:
                 .order_by(CustomCategory.name)
                 .all()
             )
-            custom_names = [row.name for row in custom_rows]
-            custom = [
-                {"id": str(row.id), "name": row.name, "is_custom": True}
-                for row in custom_rows
-            ]
+            custom_names = []
+            custom = []
+            for row in custom_rows:
+                custom_names.append(row.name)
+                custom.append({"id": str(row.id), "name": row.name, "is_custom": True})
         finally:
             db.close()
         predefined = [
@@ -3173,12 +3173,11 @@ async def create_custom_category(request: Request) -> JSONResponse:
                 {"error": "Category name is required and must be <=100 chars"},
                 status_code=400,
             )
-        for predefined in PREDEFINED_CATEGORIES:
-            if name.lower() == predefined.lower():
-                return JSONResponse(
-                    {"error": f"'{name}' already exists as a built-in category"},
-                    status_code=409,
-                )
+        if name.lower() in {c.lower() for c in PREDEFINED_CATEGORIES}:
+            return JSONResponse(
+                {"error": f"'{name}' already exists as a built-in category"},
+                status_code=409,
+            )
         db = SessionLocal()
         try:
             existing = (

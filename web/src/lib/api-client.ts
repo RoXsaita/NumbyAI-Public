@@ -425,12 +425,8 @@ class ApiClient {
     bankName: string,
     since: string
   ): Promise<ReviewQueueResponse> {
-    const params = new URLSearchParams();
-    params.append('bank_name', bankName);
-    params.append('since', since);
-    return this.request<ReviewQueueResponse>(
-      `/api/transactions/review-queue?${params.toString()}`
-    );
+    const qs = this.buildQueryParams({ bank_name: bankName, since });
+    return this.request<ReviewQueueResponse>(`/api/transactions/review-queue?${qs}`);
   }
 
   async getProfiles(): Promise<{ profiles: string[] }> {

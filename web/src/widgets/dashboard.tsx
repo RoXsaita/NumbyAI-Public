@@ -2929,15 +2929,17 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
   const [isSavingBudgets, setIsSavingBudgets] = useState(false);
   
   // Dynamic categories
-  const [spendingCategories, setSpendingCategories] = useState<string[]>(DEFAULT_SPENDING_CATEGORIES);
   const [categoriesDetail, setCategoriesDetail] = useState<{ id: string | null; name: string; is_custom: boolean }[]>([]);
+  const spendingCategories = React.useMemo(
+    () => categoriesDetail.length > 0 ? categoriesDetail.map(c => c.name) : DEFAULT_SPENDING_CATEGORIES,
+    [categoriesDetail]
+  );
   const [newCategoryName, setNewCategoryName] = useState('');
   const [isAddingCategory, setIsAddingCategory] = useState(false);
 
   const loadCategories = React.useCallback(async () => {
     try {
       const result = await apiClient.getCategories();
-      setSpendingCategories(result.categories || DEFAULT_SPENDING_CATEGORIES);
       setCategoriesDetail(result.categories_detail || []);
     } catch {
       // Fallback to defaults
