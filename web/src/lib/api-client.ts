@@ -397,6 +397,52 @@ class ApiClient {
     });
   }
 
+  streamRuleAnalysisEvents(
+    runId: string,
+    onEvent: (event: Record<string, any>) => void,
+    onDone?: () => void,
+    onError?: (err: Error) => void,
+  ): { abort: () => void } {
+    const controller = new AbortController();
+    const url = `${this.baseUrl}/api/rules/analyze/${runId}/events`;
+
+    (async () => {
+      try {
+        const response = await fetch(url, {
+          signal: controller.signal,
+          credentials: 'include',
+        });
+        if (!response.ok || !response.body) {
+          throw new Error(`SSE stream failed: ${response.status}`);
+        }
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                onEvent(JSON.parse(line.slice(6)));
+              } catch { /* skip malformed */ }
+            }
+          }
+        }
+        onDone?.();
+      } catch (err) {
+        if ((err as any)?.name === 'AbortError') return;
+        onError?.(err instanceof Error ? err : new Error(String(err)));
+      }
+    })();
+
+    return { abort: () => controller.abort() };
+  }
+
   async cleanupRules(): Promise<{ deleted: number; status: string }> {
     return this.request('/api/preferences/cleanup-rules', { method: 'POST' });
   }

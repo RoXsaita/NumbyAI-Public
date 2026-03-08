@@ -2985,6 +2985,9 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
   const [ruleAnalysisSkippedIds, setRuleAnalysisSkippedIds] = useState<Set<string>>(new Set());
   const [isSavingRuleAnalysisFinding, setIsSavingRuleAnalysisFinding] = useState(false);
   const [ruleAnalysisChosenCategory, setRuleAnalysisChosenCategory] = useState('');
+  const [ruleAnalysisStages, setRuleAnalysisStages] = useState<{stage: string; detail?: string; ts: string}[]>([]);
+  const [ruleAnalysisEventLog, setRuleAnalysisEventLog] = useState<{type: string; stage?: string; detail?: string; ts: string}[]>([]);
+  const ruleAnalysisSSERef = React.useRef<{abort: () => void} | null>(null);
 
   // Data Management tab state
   const [dataSummary, setDataSummary] = useState<{
@@ -4398,10 +4401,38 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
     }
   }, [activeTab, loadLatestRuleAnalysisRun, dataSummary, isLoadingDataSummary]);
 
+  const startRuleAnalysisSSE = React.useCallback((runId: string) => {
+    ruleAnalysisSSERef.current?.abort();
+    const handle = apiClient.streamRuleAnalysisEvents(
+      runId,
+      (event) => {
+        if (event.type === 'analysis_stage' && event.stage) {
+          setRuleAnalysisStages(prev => {
+            if (prev.some(s => s.stage === event.stage)) return prev;
+            return [...prev, { stage: event.stage, detail: JSON.stringify(event), ts: event.timestamp || new Date().toISOString() }];
+          });
+        }
+        setRuleAnalysisEventLog(prev => {
+          const entry = { type: event.type, stage: event.stage, detail: JSON.stringify(event), ts: event.timestamp || new Date().toISOString() };
+          return [...prev.slice(-99), entry];
+        });
+      },
+      () => { ruleAnalysisSSERef.current = null; },
+      () => { ruleAnalysisSSERef.current = null; },
+    );
+    ruleAnalysisSSERef.current = handle;
+  }, []);
+
+  React.useEffect(() => {
+    return () => { ruleAnalysisSSERef.current?.abort(); };
+  }, []);
+
   const handleStartRuleAnalysis = async () => {
     if (isStartingRuleAnalysis) return;
     setIsStartingRuleAnalysis(true);
     setRuleAnalysisError(null);
+    setRuleAnalysisStages([]);
+    setRuleAnalysisEventLog([]);
     try {
       const result = await apiClient.startRuleAnalysis();
       setRuleAnalysisRunId(result.run_id);
@@ -4419,6 +4450,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
       });
       setRuleAnalysisFindings([]);
       setRuleAnalysisSkippedIds(new Set());
+      startRuleAnalysisSSE(result.run_id);
     } catch (error) {
       console.error('Error starting rule analysis:', error);
       setRuleAnalysisError(getErrorMessage(error, 'Failed to start rule analysis'));
@@ -6895,6 +6927,110 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
                   ))}
                 </div>
               )}
+              {(ruleAnalysisRun?.status === 'queued' || ruleAnalysisRun?.status === 'running') && (
+                <div style={{ marginTop: SPACING.lg }}>
+                  {(() => {
+                    const pipelineSteps: {key: string; label: string; description: string}[] = [
+                      { key: 'queued', label: 'Queued', description: 'Preparing analysis run' },
+                      { key: 'started', label: 'Starting', description: 'Loading transactions and rules' },
+                      { key: 'loaded', label: 'Data Loaded', description: 'Transactions and rules loaded' },
+                      { key: 'retro_rule_cleanup_complete', label: 'Rule Cleanup', description: 'Retroactively applied existing rules' },
+                      { key: 'deterministic_scan_complete', label: 'Deterministic Scan', description: 'Scanned for conflicts and overlaps' },
+                      { key: 'cluster_scan_complete', label: 'Cluster Analysis', description: 'Analyzed transaction patterns' },
+                      { key: 'merchant_scan_complete', label: 'Merchant Scan', description: 'Checked merchant-based patterns' },
+                      { key: 'llm_suggestion_started', label: 'AI Rule Suggestions', description: 'LLM is analyzing uncovered transactions (this may take a minute)' },
+                      { key: 'uncovered_scan_complete', label: 'Uncovered Scan Done', description: 'Finished scanning uncovered transactions' },
+                      { key: 'llm_validation_started', label: 'AI Validation', description: 'LLM is validating findings (this may take a minute)' },
+                      { key: 'llm_validation_complete', label: 'Validation Done', description: 'AI validation finished' },
+                      { key: 'complete', label: 'Complete', description: 'Analysis finished' },
+                    ];
+                    const completedStageKeys = new Set(ruleAnalysisStages.map(s => s.stage));
+                    if (completedStageKeys.has('llm_validation_skipped')) {
+                      completedStageKeys.add('llm_validation_started');
+                      completedStageKeys.add('llm_validation_complete');
+                    }
+                    let activeIndex = -1;
+                    for (let i = pipelineSteps.length - 1; i >= 0; i--) {
+                      if (completedStageKeys.has(pipelineSteps[i].key)) {
+                        activeIndex = i;
+                        break;
+                      }
+                    }
+                    const getStageData = (stageKey: string) => {
+                      const evt = ruleAnalysisStages.find(s => s.stage === stageKey);
+                      if (!evt?.detail) return null;
+                      try { return JSON.parse(evt.detail); } catch { return null; }
+                    };
+                    const loadedData = getStageData('loaded');
+                    const deterministicData = getStageData('deterministic_scan_complete');
+                    const clusterData = getStageData('cluster_scan_complete');
+                    const uncoveredData = getStageData('uncovered_scan_complete');
+
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                        {pipelineSteps.map((step, idx) => {
+                          const isDone = idx <= activeIndex;
+                          const isActive = idx === activeIndex + 1 && activeIndex < pipelineSteps.length - 1;
+                          const isPending = idx > activeIndex + 1;
+                          return (
+                            <div key={step.key} style={{ display: 'flex', alignItems: 'flex-start', gap: SPACING.md }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 24 }}>
+                                <div style={{
+                                  width: 20, height: 20, borderRadius: '50%',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  fontSize: 11, fontWeight: 700,
+                                  background: isDone ? colors.primary : isActive ? colors.bg.primary : colors.bg.secondary,
+                                  color: isDone ? colors.bg.primary : isActive ? colors.primary : colors.text.secondary,
+                                  border: `2px solid ${isDone ? colors.primary : isActive ? colors.primary : colors.border.default}`,
+                                  transition: 'all 0.3s ease',
+                                }}>
+                                  {isDone ? '\u2713' : isActive ? (
+                                    <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', border: `2px solid ${colors.primary}`, borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />
+                                  ) : ''}
+                                </div>
+                                {idx < pipelineSteps.length - 1 && (
+                                  <div style={{ width: 2, height: 20, background: isDone ? colors.primary : colors.border.default, transition: 'all 0.3s ease' }} />
+                                )}
+                              </div>
+                              <div style={{ paddingBottom: idx < pipelineSteps.length - 1 ? 4 : 0, minHeight: 36 }}>
+                                <div style={{
+                                  fontSize: TYPOGRAPHY.sizes.sm,
+                                  fontWeight: isDone || isActive ? TYPOGRAPHY.weights.semibold : TYPOGRAPHY.weights.regular,
+                                  color: isDone ? colors.text.primary : isActive ? colors.primary : colors.text.secondary,
+                                  opacity: isPending ? 0.5 : 1,
+                                }}>
+                                  {step.label}
+                                  {step.key === 'loaded' && loadedData && isDone && (
+                                    <span style={{ fontWeight: TYPOGRAPHY.weights.regular, fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary, marginLeft: SPACING.sm }}>
+                                      ({loadedData.transactions ?? '?'} transactions, {loadedData.rules ?? '?'} rules)
+                                    </span>
+                                  )}
+                                  {step.key === 'deterministic_scan_complete' && deterministicData && isDone && (
+                                    <span style={{ fontWeight: TYPOGRAPHY.weights.regular, fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary, marginLeft: SPACING.sm }}>
+                                      ({deterministicData.preliminary_findings ?? 0} findings, {deterministicData.clusters ?? 0} clusters)
+                                    </span>
+                                  )}
+                                  {step.key === 'uncovered_scan_complete' && uncoveredData && isDone && (
+                                    <span style={{ fontWeight: TYPOGRAPHY.weights.regular, fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary, marginLeft: SPACING.sm }}>
+                                      ({uncoveredData.uncovered_singletons ?? 0} uncovered)
+                                    </span>
+                                  )}
+                                </div>
+                                {(isDone || isActive) && (
+                                  <div style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary }}>
+                                    {step.description}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
               {ruleAnalysisError && (
                 <div style={{ marginTop: SPACING.sm, fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.negative }}>{ruleAnalysisError}</div>
               )}
@@ -7105,27 +7241,93 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
                             {expandedReviewTxId === tx.id && currentReviewTx && (
                               <div style={{ padding: SPACING.lg, background: colors.bg.secondary, borderTop: `1px solid ${colors.border.default}` }}>
                                 {tx._review_type === 'conflict' && (
-                                  <div style={{ marginBottom: SPACING.lg, padding: SPACING.md, background: '#f5f3ff', borderRadius: 8, border: '1px solid #c4b5fd' }}>
-                                    <div style={{ fontSize: TYPOGRAPHY.sizes.xs, fontWeight: TYPOGRAPHY.weights.semibold, color: '#7c3aed', marginBottom: SPACING.sm, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                      AI Conflict
-                                    </div>
-                                    <div style={{ display: 'flex', gap: SPACING.md, marginBottom: tx.review_reason ? SPACING.sm : 0 }}>
-                                      <div style={{ flex: 1 }}>
-                                        <div style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary }}>Categorizer says</div>
-                                        <div style={{ fontSize: TYPOGRAPHY.sizes.sm, fontWeight: TYPOGRAPHY.weights.medium, color: colors.text.primary }}>{tx.category}</div>
+                                  <div style={{ marginBottom: SPACING.lg }}>
+                                    <div style={{ padding: SPACING.md, background: '#f5f3ff', borderRadius: 8, border: '1px solid #c4b5fd', marginBottom: SPACING.md }}>
+                                      <div style={{ fontSize: TYPOGRAPHY.sizes.xs, fontWeight: TYPOGRAPHY.weights.semibold, color: '#7c3aed', marginBottom: SPACING.sm, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                        AI Conflict — Pick one
                                       </div>
-                                      <div style={{ flex: 1 }}>
-                                        <div style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary }}>Reviewer says</div>
-                                        <div style={{ fontSize: TYPOGRAPHY.sizes.sm, fontWeight: TYPOGRAPHY.weights.semibold, color: '#7c3aed' }}>{tx.review_category}</div>
-                                      </div>
+                                      {tx.review_reason && (
+                                        <div style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary, fontStyle: 'italic', marginBottom: SPACING.sm }}>{tx.review_reason}</div>
+                                      )}
                                     </div>
-                                    {tx.review_reason && (
-                                      <div style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary, fontStyle: 'italic' }}>{tx.review_reason}</div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: SPACING.sm }}>
+                                      <button
+                                        onClick={() => setReviewCategory(tx.category)}
+                                        style={{
+                                          padding: `${SPACING.md}px ${SPACING.sm}px`,
+                                          border: `2px solid ${reviewCategory === tx.category ? colors.primary : colors.border.default}`,
+                                          borderRadius: 8,
+                                          background: reviewCategory === tx.category ? (theme === 'dark' ? 'rgba(220,38,38,0.1)' : '#fef2f2') : colors.bg.primary,
+                                          cursor: 'pointer',
+                                          textAlign: 'center',
+                                          transition: 'all 0.15s ease',
+                                        }}
+                                      >
+                                        <div style={{ fontSize: TYPOGRAPHY.sizes.xs, textTransform: 'uppercase', letterSpacing: '0.04em', color: colors.text.secondary, marginBottom: 4 }}>
+                                          Categorizer
+                                        </div>
+                                        <div style={{ fontSize: TYPOGRAPHY.sizes.sm, fontWeight: TYPOGRAPHY.weights.semibold, color: reviewCategory === tx.category ? colors.primary : colors.text.primary }}>
+                                          {tx.category}
+                                        </div>
+                                      </button>
+                                      <button
+                                        onClick={() => setReviewCategory(tx.review_category || '')}
+                                        style={{
+                                          padding: `${SPACING.md}px ${SPACING.sm}px`,
+                                          border: `2px solid ${reviewCategory === tx.review_category ? '#7c3aed' : colors.border.default}`,
+                                          borderRadius: 8,
+                                          background: reviewCategory === tx.review_category ? '#f5f3ff' : colors.bg.primary,
+                                          cursor: 'pointer',
+                                          textAlign: 'center',
+                                          transition: 'all 0.15s ease',
+                                        }}
+                                      >
+                                        <div style={{ fontSize: TYPOGRAPHY.sizes.xs, textTransform: 'uppercase', letterSpacing: '0.04em', color: colors.text.secondary, marginBottom: 4 }}>
+                                          Reviewer
+                                        </div>
+                                        <div style={{ fontSize: TYPOGRAPHY.sizes.sm, fontWeight: TYPOGRAPHY.weights.semibold, color: reviewCategory === tx.review_category ? '#7c3aed' : colors.text.primary }}>
+                                          {tx.review_category}
+                                        </div>
+                                      </button>
+                                      <button
+                                        onClick={() => setReviewCategory('__other__')}
+                                        style={{
+                                          padding: `${SPACING.md}px ${SPACING.sm}px`,
+                                          border: `2px solid ${reviewCategory !== '' && reviewCategory !== tx.category && reviewCategory !== tx.review_category ? '#059669' : colors.border.default}`,
+                                          borderRadius: 8,
+                                          background: reviewCategory !== '' && reviewCategory !== tx.category && reviewCategory !== tx.review_category ? '#ecfdf5' : colors.bg.primary,
+                                          cursor: 'pointer',
+                                          textAlign: 'center',
+                                          transition: 'all 0.15s ease',
+                                        }}
+                                      >
+                                        <div style={{ fontSize: TYPOGRAPHY.sizes.xs, textTransform: 'uppercase', letterSpacing: '0.04em', color: colors.text.secondary, marginBottom: 4 }}>
+                                          Other
+                                        </div>
+                                        <div style={{ fontSize: TYPOGRAPHY.sizes.sm, fontWeight: TYPOGRAPHY.weights.medium, color: reviewCategory !== '' && reviewCategory !== tx.category && reviewCategory !== tx.review_category ? '#059669' : colors.text.secondary }}>
+                                          {reviewCategory !== '' && reviewCategory !== '__other__' && reviewCategory !== tx.category && reviewCategory !== tx.review_category ? reviewCategory : 'Choose...'}
+                                        </div>
+                                      </button>
+                                    </div>
+                                    {(reviewCategory === '__other__' || (reviewCategory !== '' && reviewCategory !== tx.category && reviewCategory !== tx.review_category)) && (
+                                      <div style={{ marginTop: SPACING.sm }}>
+                                        <select
+                                          value={reviewCategory === '__other__' ? '' : reviewCategory}
+                                          onChange={(e) => setReviewCategory(e.target.value)}
+                                          style={{ width: '100%', maxWidth: 400, padding: `${SPACING.sm}px ${SPACING.md}px`, fontSize: TYPOGRAPHY.sizes.base, border: `1px solid #059669`, borderRadius: 6, background: colors.bg.primary, color: colors.text.primary }}
+                                        >
+                                          <option value="">Select category...</option>
+                                          {spendingCategories.filter(cat => cat !== tx.category && cat !== tx.review_category).map(cat => (
+                                            <option key={cat} value={cat}>{cat}</option>
+                                          ))}
+                                        </select>
+                                      </div>
                                     )}
                                   </div>
                                 )}
 
-                                {/* Category selection */}
+                                {/* Category selection (non-conflict) */}
+                                {tx._review_type !== 'conflict' && (
                                 <div style={{ marginBottom: SPACING.md }}>
                                   <label style={{ display: 'block', fontSize: TYPOGRAPHY.sizes.sm, fontWeight: TYPOGRAPHY.weights.medium, color: colors.text.primary, marginBottom: SPACING.xs }}>
                                     Category
@@ -7141,6 +7343,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
                                     ))}
                                   </select>
                                 </div>
+                                )}
 
                                 {/* Create rule checkbox */}
                                 <div style={{ marginBottom: SPACING.md }}>
@@ -7179,8 +7382,8 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
                                 <div style={{ display: 'flex', gap: SPACING.sm }}>
                                   <button
                                     onClick={handleReviewSave}
-                                    disabled={!reviewCategory || isSavingReview}
-                                    style={{ padding: `${SPACING.sm}px ${SPACING.lg}px`, fontSize: TYPOGRAPHY.sizes.sm, fontWeight: TYPOGRAPHY.weights.medium, color: colors.bg.primary, background: colors.primary, border: 'none', borderRadius: 6, cursor: !reviewCategory || isSavingReview ? 'not-allowed' : 'pointer', opacity: !reviewCategory || isSavingReview ? 0.6 : 1 }}
+                                    disabled={!reviewCategory || reviewCategory === '__other__' || isSavingReview}
+                                    style={{ padding: `${SPACING.sm}px ${SPACING.lg}px`, fontSize: TYPOGRAPHY.sizes.sm, fontWeight: TYPOGRAPHY.weights.medium, color: colors.bg.primary, background: colors.primary, border: 'none', borderRadius: 6, cursor: !reviewCategory || reviewCategory === '__other__' || isSavingReview ? 'not-allowed' : 'pointer', opacity: !reviewCategory || reviewCategory === '__other__' || isSavingReview ? 0.6 : 1 }}
                                   >
                                     {isSavingReview ? 'Saving...' : 'Save'}
                                   </button>

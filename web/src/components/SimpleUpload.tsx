@@ -1123,13 +1123,9 @@ export const SimpleUpload: React.FC = () => {
         try {
           const since = serverStartedAtRef.current || clientFallback;
           const queue = await apiClient.getTransactionReviewQueue(bankName, since);
-          if (queue.transactions.length > 0) {
-            setReviewData(queue);
-            setPendingCategoryEdits({});
-            setStep('review');
-          } else {
-            setStep('success');
-          }
+          setReviewData(queue);
+          setPendingCategoryEdits({});
+          setStep('review');
         } catch {
           setStep('success');
         }
@@ -1187,7 +1183,7 @@ export const SimpleUpload: React.FC = () => {
   const saveReviewEditsAndContinue = async () => {
     setIsSavingReview(true);
     try {
-      const edits = Object.entries(pendingCategoryEdits);
+      const edits = Object.entries(pendingCategoryEdits).filter(([, cat]) => cat && cat !== '__other__');
       if (edits.length > 0) {
         const conflictTxIds = new Set(
           (reviewData?.transactions || [])
@@ -1370,6 +1366,28 @@ export const SimpleUpload: React.FC = () => {
           </div>
 
           {/* Table */}
+          {reviewData.transactions.length === 0 ? (
+            <div style={{ padding: '48px 32px', textAlign: 'center' }}>
+              <div style={{ fontSize: '48px', marginBottom: '16px' }}>{'\u2705'}</div>
+              <h3 style={{ margin: '0 0 8px', fontSize: '20px', fontWeight: 700, color: '#0f172a' }}>All transactions look good!</h3>
+              <p style={{ margin: '0 0 24px', fontSize: '14px', color: '#64748b' }}>No transactions need manual review. All categorizations are confident.</p>
+              <button
+                onClick={() => setStep('success')}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#dc2626',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Continue to Dashboard
+              </button>
+            </div>
+          ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
@@ -1465,9 +1483,10 @@ export const SimpleUpload: React.FC = () => {
                         </span>
                       </td>
                       <td style={{ padding: '12px 16px' }}>
-                        {isConflict && tx.review_category && !isEdited && (
+                        {isConflict && tx.review_category && (
                           <div style={{
-                            display: 'flex',
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr 1fr',
                             gap: '4px',
                             marginBottom: '6px',
                             fontSize: '11px',
@@ -1475,18 +1494,20 @@ export const SimpleUpload: React.FC = () => {
                             <button
                               onClick={() => setPendingCategoryEdits((prev) => ({ ...prev, [tx.id]: tx.category }))}
                               style={{
-                                flex: 1,
-                                padding: '4px 6px',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '4px',
-                                backgroundColor: '#f8fafc',
+                                padding: '6px 4px',
+                                border: `2px solid ${currentCategory === tx.category && isEdited ? '#dc2626' : '#e2e8f0'}`,
+                                borderRadius: '6px',
+                                backgroundColor: currentCategory === tx.category && isEdited ? '#fef2f2' : '#f8fafc',
                                 cursor: 'pointer',
                                 fontSize: '11px',
-                                color: '#475569',
+                                color: currentCategory === tx.category && isEdited ? '#dc2626' : '#475569',
+                                fontWeight: currentCategory === tx.category && isEdited ? 700 : 400,
+                                textAlign: 'center',
+                                transition: 'all 0.15s ease',
                               }}
                               title="Keep categorizer choice"
                             >
-                              <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '1px', opacity: 0.75 }}>
+                              <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px', opacity: 0.75 }}>
                                 Categorizer
                               </div>
                               {tx.category}
@@ -1494,25 +1515,72 @@ export const SimpleUpload: React.FC = () => {
                             <button
                               onClick={() => setPendingCategoryEdits((prev) => ({ ...prev, [tx.id]: tx.review_category! }))}
                               style={{
-                                flex: 1,
-                                padding: '4px 6px',
-                                border: '1px solid #8b5cf6',
-                                borderRadius: '4px',
-                                backgroundColor: '#f5f3ff',
+                                padding: '6px 4px',
+                                border: `2px solid ${currentCategory === tx.review_category && isEdited ? '#7c3aed' : '#e2e8f0'}`,
+                                borderRadius: '6px',
+                                backgroundColor: currentCategory === tx.review_category && isEdited ? '#f5f3ff' : '#f8fafc',
                                 cursor: 'pointer',
                                 fontSize: '11px',
-                                color: '#7c3aed',
-                                fontWeight: 600,
+                                color: currentCategory === tx.review_category && isEdited ? '#7c3aed' : '#475569',
+                                fontWeight: currentCategory === tx.review_category && isEdited ? 700 : 400,
+                                textAlign: 'center',
+                                transition: 'all 0.15s ease',
                               }}
                               title="Use reviewer suggestion"
                             >
-                              <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '1px', opacity: 0.75 }}>
+                              <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px', opacity: 0.75 }}>
                                 Reviewer
                               </div>
                               {tx.review_category}
                             </button>
+                            <button
+                              onClick={() => setPendingCategoryEdits((prev) => ({ ...prev, [tx.id]: '__other__' }))}
+                              style={{
+                                padding: '6px 4px',
+                                border: `2px solid ${isEdited && currentCategory !== tx.category && currentCategory !== tx.review_category && currentCategory !== '__other__' ? '#059669' : currentCategory === '__other__' ? '#059669' : '#e2e8f0'}`,
+                                borderRadius: '6px',
+                                backgroundColor: isEdited && currentCategory !== tx.category && currentCategory !== tx.review_category ? '#ecfdf5' : '#f8fafc',
+                                cursor: 'pointer',
+                                fontSize: '11px',
+                                color: isEdited && currentCategory !== tx.category && currentCategory !== tx.review_category ? '#059669' : '#475569',
+                                fontWeight: isEdited && currentCategory !== tx.category && currentCategory !== tx.review_category ? 700 : 400,
+                                textAlign: 'center',
+                                transition: 'all 0.15s ease',
+                              }}
+                              title="Choose a different category"
+                            >
+                              <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px', opacity: 0.75 }}>
+                                Other
+                              </div>
+                              {isEdited && currentCategory !== tx.category && currentCategory !== tx.review_category && currentCategory !== '__other__' ? currentCategory : 'Choose...'}
+                            </button>
                           </div>
                         )}
+                        {isConflict && tx.review_category && (currentCategory === '__other__' || (isEdited && currentCategory !== tx.category && currentCategory !== tx.review_category)) && (
+                          <select
+                            value={currentCategory === '__other__' ? '' : currentCategory}
+                            onChange={(e) => {
+                              const newCat = e.target.value;
+                              setPendingCategoryEdits((prev) => ({ ...prev, [tx.id]: newCat }));
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '6px 8px',
+                              border: '1px solid #059669',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              backgroundColor: '#ecfdf5',
+                              fontWeight: 600,
+                              marginBottom: '6px',
+                            }}
+                          >
+                            <option value="" disabled>Select category...</option>
+                            {availableCategories.filter((cat) => cat !== tx.category && cat !== tx.review_category).map((cat) => (
+                              <option key={cat} value={cat}>{cat}</option>
+                            ))}
+                          </select>
+                        )}
+                        {!(isConflict && tx.review_category) && (
                         <select
                           value={currentCategory === 'MANUAL_REVIEW' ? '' : currentCategory}
                           onChange={(e) => {
@@ -1536,6 +1604,7 @@ export const SimpleUpload: React.FC = () => {
                             <option key={cat} value={cat}>{cat}</option>
                           ))}
                         </select>
+                        )}
                         {isEdited && (
                           <div style={{ marginTop: '4px' }}>
                             <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#64748b', cursor: 'pointer' }}>
@@ -1596,6 +1665,7 @@ export const SimpleUpload: React.FC = () => {
               </tbody>
             </table>
           </div>
+          )}
         </div>
       </div>
     );

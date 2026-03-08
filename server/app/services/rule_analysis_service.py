@@ -583,6 +583,12 @@ def _suggest_rules_for_singletons(
     if not status.get("available") or not singletons:
         return
 
+    _emit(progress_callback, {
+        "type": "analysis_stage",
+        "stage": "llm_suggestion_started",
+        "count": min(len(singletons), 100),
+    })
+
     batch = []
     for tx in singletons[:100]:
         batch.append({
@@ -1049,6 +1055,11 @@ def analyze_rules_for_user(
         "uncovered_singletons": len(uncovered_singletons),
     })
 
+    _emit(progress_callback, {
+        "type": "analysis_stage",
+        "stage": "llm_validation_started",
+        "findings_to_validate": len(findings),
+    })
     llm_decisions = _validate_findings_with_llm(findings, extra_categories=custom_categories)
     if llm_decisions is not None:
         filtered: List[FindingDraft] = []
