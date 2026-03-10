@@ -2903,9 +2903,10 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
     }
   }, [initialData]);
 
-  // Tab state - use default_tab from initial_filters, or default to 'overview'
+  // Tab state - use URL ?tab= param first, then default_tab from initial_filters, or default to 'overview'
   const [activeTab, setActiveTab] = useState<TabType>(() => {
-    return normalizeTab(data?.initial_filters?.default_tab);
+    const urlTab = new URLSearchParams(window.location.search).get('tab');
+    return normalizeTab(urlTab ?? data?.initial_filters?.default_tab);
   });
   
   // Update tab when default_tab changes in data
