@@ -83,3 +83,14 @@ test-results/
 
 # TypeScript
 *.tsbuildinfo
+
+# Video files (too large for git)
+*.mp4
+*.mov
+*.avi
+*.mkv
+
+# Remotion
+video-enhancement/out/
+video-enhancement/public/original.mp4
+video-enhancement/node_modules/

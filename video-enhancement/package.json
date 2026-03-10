@@ -1,0 +1,24 @@
+{
+  "name": "video-enhancement",
+  "version": "1.0.0",
+  "description": "Remotion-powered video enhancement for NumbyAI demo",
+  "scripts": {
+    "studio": "npx remotion studio src/index.ts",
+    "render": "npx remotion render src/index.ts NumbyAIDemo out/numbyai-enhanced.mp4",
+    "render:preview": "npx remotion render src/index.ts NumbyAIDemo out/numbyai-preview.mp4 --every-nth-frame=3"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@remotion/bundler": "4.0.434",
+    "@remotion/cli": "4.0.434",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "remotion": "4.0.434",
+    "typescript": "5.9.3"
+  }
+}
