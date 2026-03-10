@@ -1,0 +1,16 @@
+OTP Bank - Szamlakivonat
+Szamlaszam: XXXXXXXX-XXXXXXXX-XXXXXXXX
+Idoszak: 2026.01.01 - 2026.01.31
+Penznem: HUF
+
+Datum;Leiras;Osszeg;Egyenleg
+2026.01.02;Munkaber;850000;2456805
+2026.01.02;Lakas berleti dij;-150000;2306805
+2026.01.03;E.ON Aramszolgaltato;-24500;2282305
+2026.01.05;SPAR Szupermarket;-12345;2269960
+2026.01.06;Netflix;-3490;2266470
+2026.01.07;Visszautales Emag;35000;2301470
+2026.01.08;MOL benzinkut;-9500;2291970
+2026.01.10;Telekom Magyarorszag;-6990;2284980
+2026.01.12;Etterem Pesti Disznotoros;-5670;2279310
+2026.01.15;Allianz Hungaria biztositas;-32000;2247310

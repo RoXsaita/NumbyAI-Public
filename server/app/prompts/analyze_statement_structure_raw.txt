@@ -1,0 +1,41 @@
+You are given raw text from a bank statement file. The file may use ANY format:
+CSV with any delimiter, fixed-width columns, space-aligned columns, or other formats.
+
+Your job is to figure out the structure from scratch. Look at the raw text carefully.
+
+Raw file content:
+{{csv_sample}}
+
+Determine:
+1. What delimiter separates fields? Common options: "," ";" "\t" "|" "~" "^" ":" "#"
+   If fields are aligned by spaces, say "space". If fixed-width columns, say "fixed_width".
+2. Which column INDEX (0-based) contains the transaction date.
+3. Which column INDEX contains the main description/narrative.
+4. Which column INDEX contains the amount. If amounts are split into debit/credit columns, specify inflow_column and outflow_column instead.
+5. Which column INDEX contains the running balance, if any.
+6. Which column INDEX contains the vendor/payee, if separate from description.
+7. The date format (DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD, DD.MM.YYYY, etc.).
+8. The currency (ISO 4217 code).
+9. The number format: "us" (comma thousands, dot decimal), "eu" (dot thousands, comma decimal), "auto".
+10. How many rows to skip before the actual transaction data begins.
+
+Return only a JSON object. Use column indices as strings: "0", "1", "2", etc.
+
+{
+  "delimiter": ",",
+  "columns_found": ["0", "1", "2", "3"],
+  "date_column": "0",
+  "description_column": "1",
+  "amount_column": "2",
+  "inflow_column": null,
+  "outflow_column": null,
+  "balance_column": null,
+  "vendor_payee_column": null,
+  "date_format": "DD/MM/YYYY",
+  "currency": "USD",
+  "number_format": "auto",
+  "has_headers": true,
+  "skip_rows": 0,
+  "amount_positive_is": "debit",
+  "confidence": "medium"
+}

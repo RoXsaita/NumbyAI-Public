@@ -1,0 +1,42 @@
+SECURE BANK INTERNATIONAL
+========================
+Statement of Account
+Account Holder: John Q. Public
+Account Number: ****7890
+Account Type: Premium Savings
+Branch: Main Street
+Branch Code: 001
+City: New York
+State: NY 10001
+Country: United States
+Phone: +1-555-0100
+Email: john.public@email.com
+Tax ID: ***-**-7890
+Advisor: Jane Smith
+Advisor Phone: +1-555-0200
+Statement Number: 2026-001
+Period Start: 01/01/2026
+Period End: 01/31/2026
+Date Generated: 02/01/2026
+Opening Balance: $5,230.45
+Interest Rate: 0.05% APR
+Account Status: Active
+Last Login: 01/31/2026 23:45:00
+Overdraft Limit: $0.00
+Available Balance: $7,184.28
+Currency: USD
+Previous Statement: 12/01/2025
+Next Statement: 03/01/2026
+Page: 1 of 1
+==========================
+Date,Description,Debit,Credit,Balance
+01/02/2026,PAYROLL DIRECT DEPOSIT,,"3,250.00","8,480.45"
+01/02/2026,RENT PAYMENT,"1,200.00",,"7,280.45"
+01/03/2026,ELECTRIC COMPANY,94.30,,"7,186.15"
+01/05/2026,GROCERY STORE,87.43,,"7,098.72"
+01/06/2026,STREAMING SERVICE,15.99,,"7,082.73"
+01/07/2026,MOBILE DEPOSIT,,150.00,"7,232.73"
+01/08/2026,GAS STATION,52.00,,"7,180.73"
+01/10/2026,INTERNET PROVIDER,85.00,,"7,095.73"
+01/12/2026,RESTAURANT,24.75,,"7,070.98"
+01/15/2026,CAR INSURANCE,189.00,,"6,881.98"

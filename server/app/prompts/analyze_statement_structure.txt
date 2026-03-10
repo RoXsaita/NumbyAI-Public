@@ -11,13 +11,17 @@ Determine:
 1. Which columns exist.
 2. Which column contains the transaction date.
 3. Which column contains the main transaction description.
-4. Which column contains the transaction amount.
-5. Which column contains the balance, if present.
-6. What date format is used.
-7. What currency is used.
-8. Whether the first row contains headers.
-9. How many leading rows should be skipped.
-10. Whether positive amounts mean "debit" or "credit".
+4. Which column contains the transaction amount (single column with signed values).
+5. If there is no single amount column, which columns contain inflow (credits) and outflow (debits) separately.
+6. Which column contains the balance, if present.
+7. Which column contains the vendor/payee name, if separate from description.
+8. What date format is used (e.g. DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD, DD.MM.YYYY).
+9. What currency is used (ISO 4217 code like USD, EUR, GBP).
+10. Whether the first row contains headers.
+11. How many leading rows should be skipped before data starts.
+12. Whether positive amounts mean "debit" or "credit".
+13. What number format is used: "us" (1,234.56), "eu" (1.234,56), or "auto".
+14. What delimiter separates fields: "," or ";" or "\t" or "|" or "~" or "^" or other.
 
 JSON format:
 {
@@ -25,9 +29,14 @@ JSON format:
   "date_column": "0",
   "description_column": "1",
   "amount_column": "2",
+  "inflow_column": null,
+  "outflow_column": null,
   "balance_column": "3",
+  "vendor_payee_column": null,
   "date_format": "DD/MM/YYYY",
   "currency": "USD",
+  "number_format": "us",
+  "delimiter": ",",
   "has_headers": true,
   "skip_rows": 0,
   "amount_positive_is": "debit",

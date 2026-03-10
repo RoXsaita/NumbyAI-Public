@@ -1,0 +1,16 @@
+Bangkok Bank - Statement
+Account: XXX-X-XXXXX-X
+Period: 01/01/2026 - 31/01/2026
+Currency: THB
+
+Date,Description,Withdrawal,Deposit,Balance
+02/01/2026,Salary Transfer,,85000.00,245680.50
+02/01/2026,Rent Payment,15000.00,,230680.50
+03/01/2026,Electric Bill PEA,2450.00,,228230.50
+05/01/2026,Lotus Supermarket,1876.50,,226354.00
+06/01/2026,Netflix TH,299.00,,226055.00
+07/01/2026,Refund Lazada,,3500.00,229555.00
+08/01/2026,PTT Gas Station,1200.00,,228355.00
+10/01/2026,AIS Mobile,799.00,,227556.00
+12/01/2026,MK Restaurant,856.00,,226700.00
+15/01/2026,Muang Thai Life Ins,5500.00,,221200.00

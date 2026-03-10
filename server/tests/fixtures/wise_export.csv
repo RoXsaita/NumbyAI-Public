@@ -1,0 +1,11 @@
+TransferWise ID,Date,Amount,Currency,Description,Payment Reference,Running Balance,Exchange From,Exchange To,Payer Name,Payee Name,Payee Account Number,Merchant,Total fees
+TRANSFER-123456,02-01-2026,3250.00,USD,Incoming wire transfer,REF-001,8420.50,,,,ACME Corp,,,0.00
+TRANSFER-123457,02-01-2026,-850.00,USD,Sent money to Landlord,,7570.50,,,,John Doe,Landlord LLC,XXXX7890,,2.50
+TRANSFER-123458,03-01-2026,-94.30,USD,Card payment,,7476.20,,,,,,"Electric Co",0.00
+TRANSFER-123459,05-01-2026,-67.43,USD,Card payment,,7408.77,,,,,,"Whole Foods",0.00
+TRANSFER-123460,06-01-2026,-15.99,USD,Card payment,,7392.78,,,,,,Netflix,0.00
+TRANSFER-123461,07-01-2026,120.00,USD,Received money,REF-002,7512.78,,,,Friend,,0.00
+TRANSFER-123462,08-01-2026,-45.00,USD,Card payment,,7467.78,,,,,,Shell,0.00
+TRANSFER-123463,10-01-2026,-85.00,USD,Card payment,,7382.78,,,,,,"T-Mobile",0.00
+TRANSFER-123464,12-01-2026,-42.50,USD,Card payment,,7340.28,,,,,,Restaurant,0.00
+TRANSFER-123465,15-01-2026,-156.00,USD,Direct debit,,7184.28,,,,,,GEICO,0.00

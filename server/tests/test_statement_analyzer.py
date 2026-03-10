@@ -2081,9 +2081,15 @@ class TestNoCrashOnAllFixtures:
                 failures.append(f"{fixture.name}: {e}")
         assert not failures, f"Fixtures that crashed:\n" + "\n".join(failures)
 
+    # Fixtures where the date is embedded within another column (e.g. merged
+    # date+description in fixed-width) and requires LLM to separate.
+    _LLM_DEPENDENT_FOR_DATE = {"fixed_width_mainframe.csv"}
+
     def test_all_fixtures_detect_date(self):
         failures = []
         for fixture in self.fixtures:
+            if fixture.name in self._LLM_DEPENDENT_FOR_DATE:
+                continue
             try:
                 result = analyze_statement_structure_from_file(
                     str(fixture), DUMMY_USER_ID
@@ -2094,9 +2100,14 @@ class TestNoCrashOnAllFixtures:
                 pass  # crash tested separately
         assert not failures, f"Fixtures missing date detection: {failures}"
 
+    # Fixtures that deliberately have no description column
+    _NO_DESCRIPTION_FIXTURES = {"two_column_date_amount_only.csv"}
+
     def test_all_fixtures_detect_description(self):
         failures = []
         for fixture in self.fixtures:
+            if fixture.name in self._NO_DESCRIPTION_FIXTURES:
+                continue
             try:
                 result = analyze_statement_structure_from_file(
                     str(fixture), DUMMY_USER_ID

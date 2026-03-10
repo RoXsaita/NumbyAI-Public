@@ -61,11 +61,23 @@ def parse_csv_statement(file_path: str, schema: Dict) -> List[Dict]:
         else:
             from app.services.statement_analyzer import _expected_column_count, detect_csv_encoding
             encoding = detect_csv_encoding(file_path)
-            csv_kwargs: dict = dict(header=None, skiprows=skip_rows, sep=delimiter, encoding=encoding)
-            expected_cols = _expected_column_count(file_path, delimiter)
-            if expected_cols and expected_cols > 1:
-                csv_kwargs["names"] = list(range(expected_cols))
-            df = pd.read_csv(file_path, **csv_kwargs)
+
+            if delimiter == "fixed_width":
+                df = pd.read_fwf(
+                    file_path, header=None, skiprows=skip_rows,
+                    dtype=str, keep_default_na=False, encoding=encoding,
+                )
+            elif delimiter == "  ":
+                df = pd.read_fwf(
+                    file_path, header=None, skiprows=skip_rows,
+                    dtype=str, keep_default_na=False, encoding=encoding,
+                )
+            else:
+                csv_kwargs: dict = dict(header=None, skiprows=skip_rows, sep=delimiter, encoding=encoding)
+                expected_cols = _expected_column_count(file_path, delimiter)
+                if expected_cols and expected_cols > 1:
+                    csv_kwargs["names"] = list(range(expected_cols))
+                df = pd.read_csv(file_path, **csv_kwargs)
         
         logger.info("Parsed statement file", {
             "file_path": file_path,
@@ -457,6 +469,7 @@ def _parse_date(date_str: str, date_format: str) -> date:
         'MM-DD-YYYY': '%m-%d-%Y',
         'DD-MM-YYYY': '%d-%m-%Y',
         'YYYY/MM/DD': '%Y/%m/%d',
+        'YYYY.MM.DD': '%Y.%m.%d',
         'DD.MM.YYYY': '%d.%m.%Y',
         'DD Mon YYYY': '%d %b %Y',
         'DD/MM/YY': '%d/%m/%y',
@@ -477,8 +490,8 @@ def _parse_date(date_str: str, date_format: str) -> date:
 
     _FALLBACK_FORMATS = [
         '%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y', '%Y/%m/%d',
-        '%d-%m-%Y', '%m-%d-%Y', '%d.%m.%Y', '%d %b %Y',
-        '%d/%m/%y', '%d-%m-%y', '%Y%m%d',
+        '%Y.%m.%d', '%d-%m-%Y', '%m-%d-%Y', '%d.%m.%Y',
+        '%d %b %Y', '%d/%m/%y', '%d-%m-%y', '%Y%m%d',
     ]
     for ds in ([date_str, date_only] if date_only != date_str.strip() else [date_str]):
         for fmt in _FALLBACK_FORMATS:
@@ -512,6 +525,18 @@ def _parse_amount(amount_str: str, number_format: str = "auto") -> Decimal:
     # (e.g. "1234.56PLN" — \b has no boundary between digit '6' and letter 'P').
     amount_str = re.sub(r'(?<![A-Za-z])[A-Z]{3}(?![A-Za-z])', '', amount_str)
     amount_str = amount_str.replace('\xa0', '').replace(' ', '').replace("'", '')
+
+    # Handle Cr/Dr text suffixes (e.g. "1,234.56 DR" or "500.00 Cr")
+    cr_dr_match = re.match(r'^(.*?)\s*(DR|CR|Dr|Cr|dr|cr)\s*$', amount_str, re.IGNORECASE)
+    if cr_dr_match:
+        amount_str = cr_dr_match.group(1)
+        suffix = cr_dr_match.group(2).upper()
+        if suffix == 'DR':
+            amount_str = '-' + amount_str.lstrip('-')
+
+    # Handle trailing minus sign (e.g. "1,234.56-")
+    if amount_str.endswith('-') and not amount_str.startswith('-'):
+        amount_str = '-' + amount_str[:-1]
 
     if amount_str.startswith('(') and amount_str.endswith(')'):
         amount_str = '-' + amount_str[1:-1]

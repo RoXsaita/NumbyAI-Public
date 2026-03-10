@@ -1,0 +1,11 @@
+Transaction ID,Date,Time,Type,Name,Emoji,Category,Amount,Currency,Local amount,Local currency,Notes and #tags,Address,Receipt,Description,Category split,Money Out,Money In,Balance
+tx_001,02/01/2026,08:30:00,Payment,Tesco,,Groceries,-45.67,GBP,-45.67,GBP,,London,,"TESCO STORES 1234",,45.67,,1842.05
+tx_002,03/01/2026,14:22:00,Payment,Amazon,,Shopping,-89.99,GBP,-89.99,GBP,,Online,,"AMAZON.CO.UK",,89.99,,1752.06
+tx_003,05/01/2026,09:00:00,Transfer,John Smith,,Transfers,-150.00,GBP,-150.00,GBP,,,,,,150.00,,1602.06
+tx_004,07/01/2026,08:30:00,Transfer,Bank Transfer,,Income,500.00,GBP,500.00,GBP,,,,"BANK TRANSFER",,,500.00,2102.06
+tx_005,08/01/2026,16:45:00,Payment,Shell,,Transport,-35.00,GBP,-35.00,GBP,,London,,"SHELL FUEL",,35.00,,2067.06
+tx_006,10/01/2026,12:00:00,Payment,Netflix,,Entertainment,-12.99,GBP,-12.99,GBP,,Online,,"NETFLIX",,12.99,,2054.07
+tx_007,12/01/2026,19:30:00,Payment,Uber,,Transport,-8.50,GBP,-8.50,GBP,,London,,"UBER TRIP",,8.50,,2045.57
+tx_008,14/01/2026,11:00:00,Transfer,Jane Doe,,Transfers,75.00,GBP,75.00,GBP,,,,"FROM JANE",,,75.00,2120.57
+tx_009,15/01/2026,08:00:00,Payment,Spotify,,Entertainment,-9.99,GBP,-9.99,GBP,,Online,,"SPOTIFY",,9.99,,2110.58
+tx_010,15/01/2026,13:45:00,Payment,Sainsburys,,Groceries,-32.45,GBP,-32.45,GBP,,London,,"SAINSBURYS",,32.45,,2078.13

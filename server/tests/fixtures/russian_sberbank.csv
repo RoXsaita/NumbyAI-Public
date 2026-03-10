@@ -1,0 +1,16 @@
+Sberbank - Statement
+Account: XXXX XXXX XXXX 7890
+Period: 01.01.2026 - 31.01.2026
+Currency: RUB
+
+Date;Description;Debit;Credit;Balance
+02.01.2026;Salary Transfer;;85 000,00;245 680,50
+02.01.2026;Rent Payment;35 000,00;;210 680,50
+03.01.2026;Electricity Bill;4 500,00;;206 180,50
+05.01.2026;Pyaterochka Store;2 345,67;;203 834,83
+06.01.2026;Kinopoisk Subscription;399,00;;203 435,83
+07.01.2026;Refund Ozon;;5 000,00;208 435,83
+08.01.2026;Lukoil Gas Station;3 200,00;;205 235,83
+10.01.2026;MTS Mobile;850,00;;204 385,83
+12.01.2026;Teremok Restaurant;789,00;;203 596,83
+15.01.2026;Rosgosstrakh Insurance;12 500,00;;191 096,83

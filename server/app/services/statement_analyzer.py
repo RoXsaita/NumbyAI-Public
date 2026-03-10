@@ -17,6 +17,7 @@ logger = create_logger("statement_analyzer")
 
 _DATE_PATTERNS: List[Tuple[str, str]] = [
     (r'^\d{4}-\d{2}-\d{2}', 'YYYY-MM-DD'),
+    (r'^\d{4}\.\d{2}\.\d{2}$', 'YYYY.MM.DD'),
     (r'^\d{2}-\d{2}-\d{4}$', 'DD-MM-YYYY'),
     (r'^\d{2}/\d{2}/\d{4}$', 'DD/MM/YYYY'),
     (r'^\d{2}/\d{2}/\d{4}$', 'MM/DD/YYYY'),
@@ -61,9 +62,20 @@ _IBAN_COUNTRY_TO_CURRENCY: Dict[str, str] = {
 }
 
 # Encodings to try in order when reading CSV files.
-# Covers UTF-8 (with/without BOM), Windows-1250 (Polish/Central European bank exports),
-# ISO-8859-2 (Latin-2), and ISO-8859-1 (Latin-1 / Western European) as a last resort.
-_CSV_ENCODING_FALLBACKS = ['utf-8-sig', 'utf-8', 'cp1250', 'iso-8859-2', 'iso-8859-1']
+# Covers UTF-8 (with/without BOM), Windows codepages, ISO Latin variants,
+# and CJK encodings commonly exported by Asian banks.
+_CSV_ENCODING_FALLBACKS = [
+    'utf-8-sig', 'utf-8',
+    'cp1250',          # Polish / Central European
+    'cp1252',          # Windows Western European (curly quotes, etc.)
+    'iso-8859-2',      # Latin-2
+    'iso-8859-15',     # Latin-9 (adds Euro sign to Latin-1)
+    'iso-8859-1',      # Latin-1 / Western European
+    'shift_jis',       # Japanese
+    'gbk',             # Chinese (superset of GB2312)
+    'euc-kr',          # Korean
+    'utf-16',          # UTF-16 with auto BOM detection
+]
 
 
 def detect_csv_encoding(file_path: str) -> str:
@@ -78,40 +90,124 @@ def detect_csv_encoding(file_path: str) -> str:
     return 'utf-8'
 
 
+def _detect_fixed_width(lines: List[str]) -> Optional[List[int]]:
+    """Detect fixed-width column boundaries by finding character positions
+    where spaces align across the majority of non-empty lines.
+
+    Returns a list of column-start positions (the left edge of each column),
+    or ``None`` if the file does not appear to be fixed-width.
+    """
+    if len(lines) < 3:
+        return None
+
+    # Skip lines that are clearly metadata / decoration (box-drawing, stars, dashes)
+    data_lines = [
+        ln for ln in lines
+        if ln.strip()
+        and not all(c in '═╔╗╚╝║─┌┐└┘│*-=+' for c in ln.strip())
+    ]
+    if len(data_lines) < 3:
+        return None
+
+    max_len = max(len(ln) for ln in data_lines)
+    if max_len < 10:
+        return None
+
+    # Build a bitmap: for each character position, count lines where it's a space
+    space_counts = [0] * max_len
+    char_counts = [0] * max_len
+    for ln in data_lines:
+        for pos in range(len(ln)):
+            if ln[pos] == ' ':
+                space_counts[pos] += 1
+            else:
+                char_counts[pos] += 1
+
+    n = len(data_lines)
+    threshold = 0.8
+
+    # A boundary is a position where >=80% of lines have a space followed by
+    # a position where >=20% of lines have a non-space (i.e. start of next column)
+    boundaries = [0]
+    pos = 1
+    while pos < max_len - 1:
+        if space_counts[pos] / n >= threshold and char_counts[pos + 1] / n >= 0.2:
+            # Walk past any run of consistent spaces (the gutter)
+            end = pos
+            while end + 1 < max_len and space_counts[end + 1] / n >= threshold:
+                end += 1
+            if end + 1 < max_len:
+                boundaries.append(end + 1)
+            pos = end + 2
+        else:
+            pos += 1
+
+    if len(boundaries) >= 3:
+        return boundaries
+    return None
+
+
+def _detect_space_delimited(lines: List[str]) -> bool:
+    """Return True if the file appears to use 2+ consecutive spaces as a delimiter."""
+    data_lines = [ln for ln in lines if ln.strip()][:15]
+    if len(data_lines) < 3:
+        return False
+
+    # Count lines that contain runs of 2+ spaces separating non-space tokens
+    multi_space_re = re.compile(r'\S\s{2,}\S')
+    hits = sum(1 for ln in data_lines if multi_space_re.search(ln))
+    return hits / len(data_lines) >= 0.6
+
+
 def detect_delimiter(file_path: str) -> str:
     """Auto-detect the CSV field delimiter using csv.Sniffer with a counting fallback.
 
-    Reads up to 8 KB from the file.  Returns one of ``","`` ``";"`` ``"\\t"`` ``"|"``.
+    Supports common delimiters (``","`` ``";"`` ``"\\t"`` ``"|"``) and exotic ones
+    (``"~"`` ``"^"`` ``":"`` ``"#"``).  Returns ``"  "`` (double-space) for
+    space-aligned files and ``"fixed_width"`` for fixed-width columnar files.
     """
     try:
         enc = detect_csv_encoding(file_path)
         with open(file_path, "r", encoding=enc, errors="replace") as fh:
-            sample = fh.read(8192)
+            sample = fh.read(16384)
     except Exception:
         return ","
 
     # csv.Sniffer works well when the file is reasonably regular
     try:
-        dialect = csv.Sniffer().sniff(sample, delimiters=',;\t|')
-        if dialect.delimiter in (',', ';', '\t', '|'):
+        dialect = csv.Sniffer().sniff(sample, delimiters=',;\t|~^:#')
+        if dialect.delimiter in (',', ';', '\t', '|', '~', '^', ':', '#'):
             return dialect.delimiter
     except csv.Error:
         pass
 
-    # Fallback: count candidate delimiters across the first 10 non-empty lines
-    lines = [ln for ln in sample.splitlines() if ln.strip()][:10]
+    # Fallback: count candidate delimiters across the first 15 non-empty lines
+    lines = [ln for ln in sample.splitlines() if ln.strip()][:15]
     if not lines:
         return ","
 
-    candidates = {',': 0, ';': 0, '\t': 0, '|': 0}
+    candidates = {',': 0, ';': 0, '\t': 0, '|': 0, '~': 0, '^': 0, ':': 0, '#': 0}
     for line in lines:
         for ch in candidates:
             candidates[ch] += line.count(ch)
 
     best = max(candidates, key=lambda c: candidates[c])
-    if candidates[best] == 0:
-        return ","
-    return best
+    if candidates[best] > 0:
+        # Only accept exotic delimiters if they appear consistently (avg >= 2 per line)
+        avg_per_line = candidates[best] / len(lines)
+        if best in (',', ';', '\t', '|') or avg_per_line >= 2:
+            return best
+
+    # No standard delimiter found — check for space-delimited or fixed-width
+    all_lines = [ln for ln in sample.splitlines() if ln.strip()]
+    if _detect_space_delimited(all_lines):
+        return "  "
+
+    fw_boundaries = _detect_fixed_width(all_lines)
+    if fw_boundaries is not None:
+        return "fixed_width"
+
+    return ","
 
 
 def _expected_column_count(file_path: str, delimiter: str) -> Optional[int]:
@@ -131,7 +227,7 @@ def _expected_column_count(file_path: str, delimiter: str) -> Optional[int]:
                 line = line.strip()
                 if line:
                     lines.append(line)
-                if len(lines) >= 50:
+                if len(lines) >= 100:
                     break
     except Exception:
         return None
@@ -223,6 +319,12 @@ def _is_numeric_value(val: str) -> bool:
     for code in _CURRENCY_CODES:
         cleaned = cleaned.replace(code, '')
     cleaned = cleaned.strip()
+    # Strip Cr/Dr suffixes (e.g. "1,234.56 DR")
+    cleaned = re.sub(r'\s*(DR|CR|Dr|Cr|dr|cr)\s*$', '', cleaned)
+    # Handle trailing minus (e.g. "1,234.56-")
+    if cleaned.endswith('-') and not cleaned.startswith('-'):
+        cleaned = '-' + cleaned[:-1]
+    cleaned = cleaned.strip()
     if not cleaned:
         return False
     # After all stripping, reject if alphabetic characters remain
@@ -287,6 +389,20 @@ def _col_stats(df: pd.DataFrame, col_idx: int, sample_n: int = 20) -> Dict:
 # First transaction row detection
 # ---------------------------------------------------------------------------
 
+_FOOTER_KEYWORDS = re.compile(
+    r'\b(total|totals|sum|grand total|balance forward|closing balance|'
+    r'opening balance|statement total|subtotal|net total|'
+    r'end of statement|page \d|continued|disclaimer)\b',
+    re.IGNORECASE,
+)
+
+
+def _is_footer_row(row_vals: List[str]) -> bool:
+    """Return True if a row looks like a summary/footer rather than a transaction."""
+    text = ' '.join(str(v) for v in row_vals if str(v).strip())
+    return bool(_FOOTER_KEYWORDS.search(text))
+
+
 def _detect_first_transaction_row(df_raw: pd.DataFrame) -> int:
     """
     Scan from the top to find the first row that looks like transaction data.
@@ -299,6 +415,20 @@ def _detect_first_transaction_row(df_raw: pd.DataFrame) -> int:
         if has_date and has_numeric:
             return row_idx + 1
     return 1
+
+
+def _strip_footer_rows(df: pd.DataFrame) -> pd.DataFrame:
+    """Remove trailing summary/footer rows from the end of the DataFrame."""
+    last_good = len(df)
+    for row_idx in range(len(df) - 1, -1, -1):
+        row_vals = df.iloc[row_idx].astype(str).str.strip().tolist()
+        if _is_footer_row(row_vals):
+            last_good = row_idx
+        elif any(v and v != 'nan' for v in row_vals):
+            break
+    if last_good < len(df):
+        return df.iloc[:last_good].reset_index(drop=True)
+    return df
 
 
 # ---------------------------------------------------------------------------
@@ -659,17 +789,22 @@ _LLM_RESPONSE_SCHEMA: Dict = {
         "columns_found": {"type": "array", "items": {"type": "string"}},
         "date_column": {"type": "string"},
         "description_column": {"type": "string"},
-        "amount_column": {"type": "string"},
+        "amount_column": {"type": ["string", "null"]},
+        "inflow_column": {"type": ["string", "null"]},
+        "outflow_column": {"type": ["string", "null"]},
         "balance_column": {"type": ["string", "null"]},
+        "vendor_payee_column": {"type": ["string", "null"]},
         "date_format": {"type": "string"},
         "currency": {"type": "string"},
+        "number_format": {"type": "string"},
+        "delimiter": {"type": "string"},
         "has_headers": {"type": "boolean"},
         "skip_rows": {"type": "integer"},
         "amount_positive_is": {"type": "string"},
         "questions": {"type": "array", "items": {"type": "string"}},
         "confidence": {"type": "string"},
     },
-    "required": ["date_column", "description_column", "amount_column"],
+    "required": ["date_column", "description_column"],
 }
 
 
@@ -713,7 +848,10 @@ def _try_llm_fallback(
             "date": "date_column",
             "description": "description_column",
             "amount": "amount_column",
+            "inflow": "inflow_column",
+            "outflow": "outflow_column",
             "balance": "balance_column",
+            "vendor_payee": "vendor_payee_column",
         }
 
         for field_type, llm_key in field_to_llm_key.items():
@@ -751,6 +889,105 @@ def _try_llm_fallback(
 
 
 # ---------------------------------------------------------------------------
+# Tier 3: LLM-as-primary raw analysis
+# ---------------------------------------------------------------------------
+
+_LLM_RAW_RESPONSE_SCHEMA: Dict = {
+    "type": "object",
+    "properties": {
+        "delimiter": {"type": "string"},
+        "columns_found": {"type": "array", "items": {"type": "string"}},
+        "date_column": {"type": "string"},
+        "description_column": {"type": "string"},
+        "amount_column": {"type": ["string", "null"]},
+        "inflow_column": {"type": ["string", "null"]},
+        "outflow_column": {"type": ["string", "null"]},
+        "balance_column": {"type": ["string", "null"]},
+        "vendor_payee_column": {"type": ["string", "null"]},
+        "date_format": {"type": "string"},
+        "currency": {"type": "string"},
+        "number_format": {"type": "string"},
+        "has_headers": {"type": "boolean"},
+        "skip_rows": {"type": "integer"},
+        "amount_positive_is": {"type": "string"},
+        "confidence": {"type": "string"},
+    },
+    "required": ["delimiter", "date_column", "description_column"],
+}
+
+
+def _try_llm_raw_analysis(file_path: str) -> Optional[Dict]:
+    """Tier 3: Send raw file text to the LLM when heuristics completely failed.
+
+    Returns a ``suggested_mappings``-style dict or ``None`` if the LLM is
+    unavailable or fails.
+    """
+    try:
+        from app.services.llm_service import call_llm_json_object, get_llm_status
+
+        status = get_llm_status()
+        if not status.get("available"):
+            return None
+
+        prompt_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "prompts", "analyze_statement_structure_raw.txt",
+        )
+        if not os.path.exists(prompt_path):
+            prompt_path = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                "prompts", "analyze_statement_structure.txt",
+            )
+
+        with open(prompt_path) as f:
+            prompt_template = f.read()
+
+        enc = detect_csv_encoding(file_path)
+        with open(file_path, "r", encoding=enc, errors="replace") as fh:
+            raw_sample = fh.read(4096)
+
+        prompt = prompt_template.replace("{{csv_sample}}", raw_sample)
+        llm_result = call_llm_json_object(prompt, _LLM_RAW_RESPONSE_SCHEMA)
+        logger.info("LLM raw analysis returned", {"keys": list(llm_result.keys())})
+
+        # Build suggested_mappings from LLM result
+        col_mappings: Dict[str, str] = {}
+        for field, llm_key in [
+            ("date", "date_column"),
+            ("description", "description_column"),
+            ("amount", "amount_column"),
+            ("inflow", "inflow_column"),
+            ("outflow", "outflow_column"),
+            ("balance", "balance_column"),
+            ("vendor_payee", "vendor_payee_column"),
+        ]:
+            val = llm_result.get(llm_key)
+            if val and str(val).strip():
+                try:
+                    int(str(val).strip())
+                    col_mappings[str(val).strip()] = field
+                except ValueError:
+                    continue
+
+        skip_rows = llm_result.get("skip_rows", 0)
+        first_tx = int(skip_rows) + 1 if skip_rows is not None else 1
+
+        return {
+            "column_mappings": col_mappings,
+            "first_transaction_row": first_tx,
+            "date_format": llm_result.get("date_format", "DD/MM/YYYY"),
+            "currency": llm_result.get("currency", "USD"),
+            "number_format": llm_result.get("number_format", "auto"),
+            "delimiter": llm_result.get("delimiter", ","),
+            "confidence": {k: "medium" for k in col_mappings.values()},
+        }
+
+    except Exception as e:
+        logger.warn("LLM raw analysis failed", {"error": str(e)})
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Main analysis function
 # ---------------------------------------------------------------------------
 
@@ -765,22 +1002,43 @@ def analyze_statement_structure_from_file(file_path: str, user_id: str) -> Dict:
     try:
         delimiter = ","
         if file_path.endswith('.xlsx') or file_path.endswith('.xls'):
-            df_raw = pd.read_excel(file_path, nrows=50, dtype=str, keep_default_na=False, header=None)
+            df_raw = pd.read_excel(file_path, nrows=100, dtype=str, keep_default_na=False, header=None)
         else:
             delimiter = detect_delimiter(file_path)
             encoding = detect_csv_encoding(file_path)
-            expected_cols = _expected_column_count(file_path, delimiter)
-            csv_kwargs: Dict = dict(
-                nrows=50, dtype=str, keep_default_na=False, header=None, sep=delimiter,
-                encoding=encoding,
-            )
-            if expected_cols and expected_cols > 1:
-                csv_kwargs["names"] = list(range(expected_cols))
-            try:
-                df_raw = pd.read_csv(file_path, **csv_kwargs)
-            except pd.errors.ParserError:
-                csv_kwargs["on_bad_lines"] = "skip"
-                df_raw = pd.read_csv(file_path, **csv_kwargs)
+
+            if delimiter == "fixed_width":
+                # Fixed-width columnar file: use pd.read_fwf
+                try:
+                    df_raw = pd.read_fwf(
+                        file_path, nrows=100, dtype=str,
+                        keep_default_na=False, header=None, encoding=encoding,
+                    )
+                except Exception:
+                    df_raw = pd.read_fwf(
+                        file_path, nrows=100, dtype=str,
+                        keep_default_na=False, header=None,
+                        encoding=encoding, on_bad_lines="skip",
+                    )
+            elif delimiter == "  ":
+                # Space-aligned: use read_fwf which handles variable-width gutters
+                df_raw = pd.read_fwf(
+                    file_path, nrows=100, dtype=str,
+                    keep_default_na=False, header=None, encoding=encoding,
+                )
+            else:
+                expected_cols = _expected_column_count(file_path, delimiter)
+                csv_kwargs: Dict = dict(
+                    nrows=100, dtype=str, keep_default_na=False, header=None, sep=delimiter,
+                    encoding=encoding,
+                )
+                if expected_cols and expected_cols > 1:
+                    csv_kwargs["names"] = list(range(expected_cols))
+                try:
+                    df_raw = pd.read_csv(file_path, **csv_kwargs)
+                except pd.errors.ParserError:
+                    csv_kwargs["on_bad_lines"] = "skip"
+                    df_raw = pd.read_csv(file_path, **csv_kwargs)
 
         columns_found = [str(i) for i in range(len(df_raw.columns))]
         first_tx_row = _detect_first_transaction_row(df_raw)
@@ -789,6 +1047,9 @@ def analyze_statement_structure_from_file(file_path: str, user_id: str) -> Dict:
         df = df_raw.iloc[first_tx_row - 1:].reset_index(drop=True)
         if len(df) < 2:
             df = df_raw
+
+        # Strip footer/summary rows
+        df = _strip_footer_rows(df)
 
         # --- Detect columns ---
         date_column, date_format, date_conf = _detect_date_column(df)
@@ -859,11 +1120,46 @@ def analyze_statement_structure_from_file(file_path: str, user_id: str) -> Dict:
             "confidence": confidence_map,
         }
 
-        # --- LLM fallback for low-confidence heuristics ---
-        if overall == "low":
+        # --- LLM fallback ---
+        # Tier 2: any critical field (date, amount/inflow, description) is low confidence
+        # Tier 3: overall is low (heuristics couldn't find required fields)
+        critical_fields_low = any(
+            confidence_map.get(f) == "low"
+            for f in ("date", "amount", "inflow", "description")
+        )
+        needs_llm = overall == "low" or critical_fields_low
+        if needs_llm:
             suggested_mappings = _try_llm_fallback(
                 file_path, df_raw, suggested_mappings, confidence_map,
             )
+            # Re-evaluate overall confidence after LLM merge
+            updated_cm = suggested_mappings.get("confidence", confidence_map)
+            required_found_after = (
+                "date" in suggested_mappings.get("column_mappings", {}).values()
+                and "description" in suggested_mappings.get("column_mappings", {}).values()
+                and (
+                    "amount" in suggested_mappings.get("column_mappings", {}).values()
+                    or "inflow" in suggested_mappings.get("column_mappings", {}).values()
+                )
+            )
+            if required_found_after:
+                overall = "medium" if any(
+                    v == "low" for v in updated_cm.values()
+                ) else "high"
+
+        # Tier 3: if still low after Tier 2, try raw LLM analysis from scratch
+        if overall == "low":
+            raw_result = _try_llm_raw_analysis(file_path)
+            if raw_result:
+                cm_vals = raw_result.get("column_mappings", {}).values()
+                has_required = (
+                    "date" in cm_vals and "description" in cm_vals
+                    and ("amount" in cm_vals or "inflow" in cm_vals)
+                )
+                if has_required:
+                    suggested_mappings = raw_result
+                    overall = "medium"
+                    logger.info("Tier 3 LLM raw analysis succeeded")
 
         # --- Legacy analysis dict (kept for backward compatibility) ---
         has_headers = first_tx_row > 1
