@@ -472,7 +472,7 @@ class ApiClient {
     since: string
   ): Promise<ReviewQueueResponse> {
     const qs = this.buildQueryParams({ bank_name: bankName, since });
-    return this.request<ReviewQueueResponse>(`/api/transactions/review-queue?${qs}`);
+    return this.request<ReviewQueueResponse>(`/api/transactions/review-queue${qs}`);
   }
 
   async getProfiles(): Promise<{ profiles: string[] }> {
@@ -739,7 +739,8 @@ class ApiClient {
           }
           if (onEvent) onEvent(event);
         } catch (e) {
-          // Ignore malformed JSON fragments
+          if (e instanceof SyntaxError) continue;
+          throw e;
         }
       }
     }

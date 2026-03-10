@@ -73,7 +73,7 @@ restart: ensure-venv ensure-frontend
 	@echo "✓ All servers stopped"
 	@echo ""
 	@echo "Step 2: Running database migrations..."
-	@cd server && .venv/bin/alembic upgrade head > /dev/null 2>&1 && echo "✓ Database migrations applied" || echo "⚠ Database migration check completed"
+	@cd server && .venv/bin/alembic upgrade head > /dev/null && echo "✓ Database migrations applied" || echo "⚠ Database migration failed (check errors above)"
 	@echo ""
 	@echo "Step 3: Building frontend app..."
 	@cd web && npm run build > /dev/null 2>&1 && echo "✓ Frontend built successfully" || (echo "✗ Frontend build failed" && exit 1)
