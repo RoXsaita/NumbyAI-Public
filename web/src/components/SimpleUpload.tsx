@@ -1216,6 +1216,7 @@ export const SimpleUpload: React.FC = () => {
           })
         );
       }
+      setDashboardOverride(null); // force fresh fetch so user edits are reflected
       setStep('success');
     } catch (err) {
       console.error('Failed to save review edits:', err);
