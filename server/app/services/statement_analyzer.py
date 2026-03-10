@@ -47,6 +47,7 @@ _CURRENCY_CODES: List[str] = [
     'KRW', 'TWD', 'ILS', 'AED', 'SAR', 'EGP', 'NGN', 'KWD', 'OMR', 'BHD',
     'QAR', 'JOD', 'LBP', 'MAD', 'TND', 'DZD',
 ]
+_CURRENCY_CODES_SET = frozenset(_CURRENCY_CODES)
 
 _IBAN_COUNTRY_TO_CURRENCY: Dict[str, str] = {
     'DE': 'EUR', 'FR': 'EUR', 'IT': 'EUR', 'ES': 'EUR', 'NL': 'EUR', 'BE': 'EUR',
@@ -372,9 +373,11 @@ def _detect_amount_columns(
     if not numeric_cols:
         return (None, None, None, "low")
 
-    # Check for inflow/outflow pair: look for adjacent columns where one has
-    # high numeric score and the neighbor has at least some numeric values,
-    # and the two are complementary (one empty when the other isn't).
+    # Check for inflow/outflow pair: adjacent columns with MUTUAL complementarity
+    # (A empty when B isn't AND B empty when A isn't). One-directional emptiness
+    # (e.g. sparse account-number column next to always-filled amount column) is
+    # rejected — true inflow/outflow pairs must have both directions represented.
+    numeric_col_idxs = {idx for idx, _ in numeric_cols}
     for col_a_idx, a_score in numeric_cols:
         for offset in [1, 2]:
             col_b_idx = col_a_idx + offset
@@ -382,21 +385,30 @@ def _detect_amount_columns(
                 continue
             if str(col_b_idx) in exclude_cols:
                 continue
-            if not _has_any_numeric(df, col_b_idx):
+            if col_b_idx not in numeric_col_idxs:
                 continue
 
             a_data = df.iloc[:, col_a_idx].astype(str).str.strip()
             b_data = df.iloc[:, col_b_idx].astype(str).str.strip()
             sample_len = min(20, len(df))
-            complementary = 0
+            a_fills_b_empty = 0
+            b_fills_a_empty = 0
             for r in range(sample_len):
                 a_val = a_data.iloc[r] if r < len(a_data) else ''
                 b_val = b_data.iloc[r] if r < len(b_data) else ''
                 a_empty = (a_val == '' or a_val == '0' or a_val == '0.00')
                 b_empty = (b_val == '' or b_val == '0' or b_val == '0.00')
-                if a_empty != b_empty:
-                    complementary += 1
-            if sample_len > 0 and complementary / sample_len >= 0.6:
+                if a_empty and not b_empty:
+                    b_fills_a_empty += 1
+                elif not a_empty and b_empty:
+                    a_fills_b_empty += 1
+            total_complementary = a_fills_b_empty + b_fills_a_empty
+            if (
+                sample_len > 0
+                and a_fills_b_empty >= 2
+                and b_fills_a_empty >= 2
+                and total_complementary / sample_len >= 0.6
+            ):
                 return (None, str(col_a_idx), str(col_b_idx), "high")
 
     # Single amount column: pick the one with the highest numeric score
@@ -522,12 +534,17 @@ def _detect_currency(
     appear in a dedicated column (e.g. German "Währung"), in amount cells
     (e.g. "$1,234"), or in metadata rows anywhere in the file.
 
+    Uses frequency-based detection for ISO codes: counts occurrences of each
+    code across all cells and picks the most frequent one.  Standalone cells
+    that contain ONLY a currency code (e.g. a dedicated "Currency" column with
+    "PLN") are weighted 5× higher than codes embedded in longer descriptions
+    (e.g. "127.00 PLN BLISKI WSCHOD").
+
     Falls back to IBAN country-prefix inference when no explicit code/symbol is
     found.  Returns ``("USD", "low")`` only as a last resort.
     """
     scan_texts: List[str] = []
 
-    # Scan every cell in the dataframe (cap at 200 rows to stay fast on huge files)
     max_rows = min(200, len(df_raw))
     for row_idx in range(max_rows):
         for col_idx in range(len(df_raw.columns)):
@@ -535,7 +552,6 @@ def _detect_currency(
             if cell and cell.lower() != 'nan':
                 scan_texts.append(cell)
 
-    # Also scan amount/inflow/outflow column values explicitly
     for col_ref in [amount_col, inflow_col, outflow_col]:
         if col_ref is not None:
             col_data = df_raw.iloc[:, int(col_ref)].astype(str).str.strip()
@@ -544,17 +560,35 @@ def _detect_currency(
     combined = ' '.join(scan_texts)
 
     # 1) Check for currency symbols (highest confidence)
+    symbol_counts: Dict[str, int] = {}
     for symbol, code in _CURRENCY_SYMBOLS.items():
         if symbol in combined:
-            return (code, "high")
+            symbol_counts[code] = symbol_counts.get(code, 0) + combined.count(symbol)
 
-    # 2) Check for ISO currency codes as whole words
-    combined_upper = combined.upper()
-    for code in _CURRENCY_CODES:
-        if re.search(r'\b' + code + r'\b', combined_upper):
-            return (code, "medium")
+    if symbol_counts:
+        best_symbol = max(symbol_counts, key=lambda c: symbol_counts[c])
+        return (best_symbol, "high")
+
+    # 2) Count ISO currency code occurrences (frequency-based, not first-match).
+    # Standalone cells (cell == code) get 5× weight vs embedded mentions.
+    code_scores: Dict[str, int] = {}
+    standalone_weight = 5
+    for cell in scan_texts:
+        cell_upper = cell.strip().upper()
+        if cell_upper in _CURRENCY_CODES_SET:
+            code_scores[cell_upper] = code_scores.get(cell_upper, 0) + standalone_weight
+            continue
+        for code in _CURRENCY_CODES:
+            if re.search(r'\b' + code + r'\b', cell_upper):
+                code_scores[code] = code_scores.get(code, 0) + 1
+
+    if code_scores:
+        best_code = max(code_scores, key=lambda c: code_scores[c])
+        confidence = "high" if code_scores[best_code] >= 10 else "medium"
+        return (best_code, confidence)
 
     # 3) Infer from IBAN country prefix (medium-low confidence)
+    combined_upper = combined.upper()
     iban_match = re.search(r'\b([A-Z]{2})\d{2}[\s]?\d', combined_upper)
     if iban_match:
         country = iban_match.group(1)
