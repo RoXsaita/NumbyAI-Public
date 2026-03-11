@@ -8,6 +8,25 @@ Upload any bank statement CSV and NumbyAI automatically detects the format, cate
 
 ---
 
+## Demo
+
+### Upload & AI Categorization
+Drop a bank statement CSV and watch NumbyAI auto-detect columns and categorize every transaction using a local LLM.
+
+![Upload and AI Categorization](docs/demo/01-upload-categorize.gif)
+
+### Dashboard
+Track spending by category, monitor budgets, and analyze cash flow trends — all from a single view.
+
+![Dashboard Overview](docs/demo/02-dashboard.gif)
+
+### Rule Advisor
+The Rule Advisor analyzes your categorization patterns and suggests reusable rules, making future uploads instant.
+
+![Rule Advisor](docs/demo/03-rule-advisor.gif)
+
+---
+
 ## What it does
 
 1. **Drop any CSV** — the heuristic parser detects metadata rows, column layout, date format, currency, and number format automatically, without you mapping anything. Falls back to the LLM when confidence is low.
