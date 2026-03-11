@@ -90,7 +90,5 @@ test-results/
 *.avi
 *.mkv
 
-# Remotion
-video-enhancement/out/
-video-enhancement/public/original.mp4
-video-enhancement/node_modules/
+# Remotion (video tooling — not part of the app)
+video-enhancement/
