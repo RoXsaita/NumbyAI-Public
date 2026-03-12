@@ -10,6 +10,8 @@ Upload any bank statement CSV and NumbyAI automatically detects the format, cate
 
 ## Demo
 
+> **Full demo video (70s):** [Watch on GitHub →](https://github.com/RoXsaita/NumbyAI-Public/releases/download/v1.0.0/numbyai-demo.mp4)
+
 ### Upload & AI Categorization
 Drop a bank statement CSV and watch NumbyAI auto-detect columns and categorize every transaction using a local LLM.
 
