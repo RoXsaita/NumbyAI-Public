@@ -123,7 +123,30 @@ Dashboard
 - **Multi-bank** — each upload is tagged to a bank; rules can be bank-specific or global
 - **Auth optional** — runs in single-user mode with no auth required; plug in Auth0 for multi-user
 - **SQLite (dev) / PostgreSQL (prod)** — swap via `DATABASE_URL`
-- **Privacy first** — no telemetry, no external API calls, runs entirely on your machine
+- **Privacy first** — no telemetry, runs entirely on your machine by default (optional cloud LLM providers available)
+
+---
+
+## LLM Providers
+
+NumbyAI defaults to **Ollama** (local inference, no data leaves your machine). You can optionally switch to a cloud provider for faster results or when local GPU resources are limited.
+
+### Ollama (default)
+
+No additional setup — just have Ollama running locally. See [Quick Start](#quick-start).
+
+### MiniMax
+
+[MiniMax](https://www.minimaxi.com/) offers high-quality, cost-effective models with a 204K context window via an OpenAI-compatible API.
+
+```bash
+# In server/.env
+LLM_PROVIDER=minimax
+MINIMAX_API_KEY=your-api-key-here
+MINIMAX_MODEL=MiniMax-M2.5          # or MiniMax-M2.5-highspeed for faster responses
+```
+
+> **Note:** Using a cloud provider means transaction descriptions are sent to the provider's API for categorization.
 
 ---
 
@@ -241,8 +264,12 @@ All config via environment variables. See [`server/.env.example`](server/.env.ex
 |---|---|---|
 | `DATABASE_URL` | DB connection string | `sqlite:///./finance_recon.db` |
 | `SECRET_KEY` | JWT signing key | `dev-only-not-for-production` |
+| `LLM_PROVIDER` | LLM backend (`ollama` or `minimax`) | `ollama` |
 | `OLLAMA_URL` | Ollama server URL | `http://localhost:11434` |
 | `OLLAMA_MODEL` | Model for categorization | `qwen3.5:9b` |
+| `MINIMAX_API_KEY` | MiniMax API key (required when provider is `minimax`) | — |
+| `MINIMAX_BASE_URL` | MiniMax API base URL | `https://api.minimax.io/v1` |
+| `MINIMAX_MODEL` | MiniMax model name | `MiniMax-M2.5` |
 | `CATEGORIZATION_BATCH_SIZE` | Transactions per LLM batch | `20` |
 | `CATEGORIZATION_MAX_WORKERS` | Parallel batch workers | `2` |
 | `AUTH0_DOMAIN` | Auth0 domain (optional) | Disabled |
