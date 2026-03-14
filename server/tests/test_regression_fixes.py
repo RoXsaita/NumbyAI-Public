@@ -240,6 +240,67 @@ class LlmProviderSelectionRegressionTests(unittest.TestCase):
         self.assertEqual(status["provider"], "ollama")
         self.assertTrue(status["available"])
 
+class MiniMaxProviderTests(unittest.TestCase):
+    def test_minimax_provider_alias_resolves(self):
+        self.assertEqual(llm_service.normalize_llm_provider("minimax"), "minimax")
+
+    def test_minimax_in_supported_providers(self):
+        self.assertIn("minimax", llm_service._SUPPORTED_PROVIDERS)
+
+    def test_minimax_provider_selected_via_config(self):
+        with patch.object(llm_service.settings, "llm_provider", "minimax"):
+            provider = llm_service.get_effective_llm_provider()
+        self.assertEqual(provider, "minimax")
+
+    def test_minimax_status_missing_api_key(self):
+        with patch.object(llm_service.settings, "minimax_api_key", None):
+            status = llm_service.get_minimax_status()
+        self.assertFalse(status["available"])
+        self.assertIn("not set", status["error"])
+
+    @patch("app.services.llm_service.requests.get")
+    def test_minimax_status_reachable(self, mock_get):
+        mock_get.return_value = _MockResponse({"data": [{"id": "MiniMax-M2.5"}]})
+        with patch.object(llm_service.settings, "minimax_api_key", "test-key"):
+            status = llm_service.get_minimax_status()
+        self.assertTrue(status["available"])
+        self.assertEqual(status["provider"], "minimax")
+
+    @patch("app.services.llm_service.requests.get")
+    def test_get_llm_status_dispatches_to_minimax(self, mock_get):
+        mock_get.return_value = _MockResponse({"data": [{"id": "MiniMax-M2.5"}]})
+        with patch.object(llm_service.settings, "minimax_api_key", "test-key"):
+            status = llm_service.get_llm_status(provider_override="minimax")
+        self.assertEqual(status["provider"], "minimax")
+        self.assertTrue(status["available"])
+
+    @patch("app.services.llm_service.requests.post")
+    def test_call_minimax_json_array(self, mock_post):
+        mock_post.return_value = _MockResponse({
+            "choices": [{"message": {"content": '[{"id": 1, "category": "Food"}]'}}]
+        })
+        with patch.object(llm_service.settings, "minimax_api_key", "test-key"):
+            result = llm_service.call_llm_json_array(
+                "test prompt",
+                {"type": "array"},
+                provider_override="minimax",
+            )
+        self.assertEqual(result, [{"id": 1, "category": "Food"}])
+
+    @patch("app.services.llm_service.requests.post")
+    def test_call_minimax_json_object(self, mock_post):
+        mock_post.return_value = _MockResponse({
+            "choices": [{"message": {"content": '{"result": "ok"}'}}]
+        })
+        with patch.object(llm_service.settings, "minimax_api_key", "test-key"):
+            result = llm_service.call_llm_json_object(
+                "test prompt",
+                {"type": "object"},
+                provider_override="minimax",
+            )
+        self.assertEqual(result, {"result": "ok"})
+
+
 class E2ECategorizationReportTests(unittest.TestCase):
     def test_report_fails_when_category_breakdown_unavailable(self):
         events = [
