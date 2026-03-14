@@ -10,8 +10,6 @@ Upload any bank statement CSV and NumbyAI automatically detects the format, cate
 
 ## Demo
 
-> **Full demo video (70s):** [Watch on GitHub →](https://github.com/RoXsaita/NumbyAI-Public/releases/download/v1.0.0/numbyai-demo.mp4)
-
 [![NumbyAI YouTube Demo](https://img.youtube.com/vi/lF8CLE2W5FI/hqdefault.jpg)](https://www.youtube.com/watch?v=lF8CLE2W5FI)
 
 > **Updated walkthrough:** [Watch on YouTube →](https://www.youtube.com/watch?v=lF8CLE2W5FI)
