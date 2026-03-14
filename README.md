@@ -10,7 +10,7 @@ Upload any bank statement CSV and NumbyAI automatically detects the format, cate
 
 ## Demo
 
-> **Updated walkthrough:** [Watch on YouTube →](https://www.youtube.com/watch?v=lF8CLE2W5FI)
+> **NumbyAI Demo:** [Watch on YouTube →](https://www.youtube.com/watch?v=lF8CLE2W5FI)
 
 ### Upload & AI Categorization
 Drop a bank statement CSV and watch NumbyAI auto-detect columns and categorize every transaction using a local LLM.
@@ -70,6 +70,8 @@ Most tools require you to manually map columns. NumbyAI's heuristic engine handl
 | UBS | 🇨🇭 CH | CHF currency detection, preamble rows |
 | BNP Paribas | 🇫🇷 FR | Semicolon-delimited, signed amounts |
 | NAB | 🇦🇺 AU | AUD, debit/credit columns |
+| Santander | 🇬🇧 UK / 🇪🇸 ES | Multiple regional formats |
+| Revolut | 🌍 Multi | Multi-currency exports |
 | Tab-delimited | Any | Auto-detected |
 | Pipe-delimited | Any | Auto-detected |
 | Generic w/ metadata | Any | Account info header rows auto-skipped |
