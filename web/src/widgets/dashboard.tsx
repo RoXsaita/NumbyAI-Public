@@ -177,12 +177,6 @@ const STATUS_COLORS = {
   danger: '#dc2626',
 } as const;
 
-const VALID_CURRENCIES = [
-  'USD','EUR','GBP','JPY','CHF','CAD','AUD','NZD','CNY','HKD','SGD','SEK','NOK',
-  'DKK','PLN','CZK','HUF','RON','BGN','HRK','RUB','TRY','ZAR','BRL','MXN','ARS',
-  'CLP','COP','PEN','INR','IDR','MYR','PHP','THB','VND','KRW','TWD','ILS','AED',
-  'SAR','QAR','KWD','BHD','OMR','JOD','EGP','NGN','KES','GHS','MAD',
-];
 
 // ============================================================================
 // DISPLAY HELPERS (replace nested ternaries with named functions)
@@ -2992,7 +2986,7 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
   const [isLoadingRuleAnalysisFindings, setIsLoadingRuleAnalysisFindings] = useState(false);
   const [ruleAnalysisSkippedIds, setRuleAnalysisSkippedIds] = useState<Set<string>>(new Set());
   const [isSavingRuleAnalysisFinding, setIsSavingRuleAnalysisFinding] = useState(false);
-  const [isSavingCurrency, setIsSavingCurrency] = useState(false);
+
   const [ruleAnalysisChosenCategory, setRuleAnalysisChosenCategory] = useState('');
   const [ruleAnalysisStages, setRuleAnalysisStages] = useState<{stage: string; detail?: string; ts: string}[]>([]);
   const [ruleAnalysisEventLog, setRuleAnalysisEventLog] = useState<{type: string; stage?: string; detail?: string; ts: string}[]>([]);
@@ -7873,34 +7867,12 @@ export const DashboardWidget: React.FC<DashboardWidgetProps> = ({ initialData = 
                           <div style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.secondary, marginBottom: SPACING.xs }}>
                             Functional Currency
                           </div>
-                          <select
-                            value={preferencesData.settings.functional_currency ?? ''}
-                            disabled={isSavingCurrency}
-                            onChange={async (e) => {
-                              const newCurrency = e.target.value;
-                              setIsSavingCurrency(true);
-                              try {
-                                await apiClient.saveCurrency(newCurrency);
-                                await loadPreferences();
-                              } finally {
-                                setIsSavingCurrency(false);
-                              }
-                            }}
-                            style={{
-                              fontSize: TYPOGRAPHY.sizes.md,
-                              fontWeight: TYPOGRAPHY.weights.semibold,
-                              color: colors.text.primary,
-                              background: colors.bg.secondary,
-                              border: 'none',
-                              cursor: 'pointer',
-                              padding: 0,
-                              width: '100%',
-                            }}
-                          >
-                            {VALID_CURRENCIES.map(c => (
-                              <option key={c} value={c}>{c}</option>
-                            ))}
-                          </select>
+                          <div style={{ fontSize: TYPOGRAPHY.sizes.md, fontWeight: TYPOGRAPHY.weights.semibold, color: colors.text.primary }}>
+                            {preferencesData.settings.functional_currency || '\u2014'}
+                          </div>
+                          <div style={{ fontSize: TYPOGRAPHY.sizes.xs, color: colors.text.tertiary, marginTop: 4 }}>
+                            Set during statement upload
+                          </div>
                         </div>
                         {preferencesData.settings.profiles && preferencesData.settings.profiles.length > 0 && (
                           <div style={{ padding: SPACING.md, background: colors.bg.secondary, borderRadius: 8 }}>

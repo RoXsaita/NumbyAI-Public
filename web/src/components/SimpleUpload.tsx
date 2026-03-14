@@ -26,13 +26,26 @@ type UploadStep =
   | 'review'
   | 'success';
 
-const COMMON_CURRENCIES = [
-  'USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'CNY', 'HKD',
-  'SGD', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'HUF', 'RON', 'BGN', 'HRK',
-  'RUB', 'TRY', 'ZAR', 'BRL', 'MXN', 'ARS', 'CLP', 'COP', 'PEN', 'INR',
-  'IDR', 'MYR', 'PHP', 'THB', 'VND', 'KRW', 'TWD', 'ILS', 'AED', 'SAR',
-  'QAR', 'KWD', 'BHD', 'OMR', 'JOD', 'EGP', 'NGN', 'KES', 'GHS', 'MAD',
-];
+const CURRENCY_INFO: Record<string, string> = {
+  USD: 'US Dollar', EUR: 'Euro', GBP: 'British Pound', JPY: 'Japanese Yen',
+  CHF: 'Swiss Franc', CAD: 'Canadian Dollar', AUD: 'Australian Dollar',
+  NZD: 'New Zealand Dollar', CNY: 'Chinese Yuan', HKD: 'Hong Kong Dollar',
+  SGD: 'Singapore Dollar', SEK: 'Swedish Krona', NOK: 'Norwegian Krone',
+  DKK: 'Danish Krone', PLN: 'Polish Zloty', CZK: 'Czech Koruna',
+  HUF: 'Hungarian Forint', RON: 'Romanian Leu', BGN: 'Bulgarian Lev',
+  HRK: 'Croatian Kuna', RUB: 'Russian Ruble', TRY: 'Turkish Lira',
+  ZAR: 'South African Rand', BRL: 'Brazilian Real', MXN: 'Mexican Peso',
+  ARS: 'Argentine Peso', CLP: 'Chilean Peso', COP: 'Colombian Peso',
+  PEN: 'Peruvian Sol', INR: 'Indian Rupee', IDR: 'Indonesian Rupiah',
+  MYR: 'Malaysian Ringgit', PHP: 'Philippine Peso', THB: 'Thai Baht',
+  VND: 'Vietnamese Dong', KRW: 'South Korean Won', TWD: 'Taiwan Dollar',
+  ILS: 'Israeli Shekel', AED: 'UAE Dirham', SAR: 'Saudi Riyal',
+  QAR: 'Qatari Riyal', KWD: 'Kuwaiti Dinar', BHD: 'Bahraini Dinar',
+  OMR: 'Omani Rial', JOD: 'Jordanian Dinar', EGP: 'Egyptian Pound',
+  NGN: 'Nigerian Naira', KES: 'Kenyan Shilling', GHS: 'Ghanaian Cedi',
+  MAD: 'Moroccan Dirham',
+};
+const COMMON_CURRENCIES = Object.keys(CURRENCY_INFO);
 
 
 
@@ -89,6 +102,9 @@ export const SimpleUpload: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string>('');
   const [currency, setCurrency] = useState<string>('');
+  const [currencySearch, setCurrencySearch] = useState<string>('');
+  const [currencyDropdownOpen, setCurrencyDropdownOpen] = useState(false);
+  const currencyDropdownRef = useRef<HTMLDivElement>(null);
   const [userCurrency, setUserCurrency] = useState<string | null>(null);
   const [banks, setBanks] = useState<string[]>([]);
   const [bankName, setBankName] = useState<string>('');
@@ -620,6 +636,16 @@ export const SimpleUpload: React.FC = () => {
   }, [columnMappings]);
 
   useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (currencyDropdownRef.current && !currencyDropdownRef.current.contains(e.target as Node)) {
+        setCurrencyDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
     setExcludedTransactionRows((prev) => {
       const maxRows = uploadResult?.total_rows || Number.MAX_SAFE_INTEGER;
       const filtered = prev.filter((row) => row >= firstTransactionRow && row <= maxRows);
@@ -672,12 +698,11 @@ export const SimpleUpload: React.FC = () => {
 
       if (result.currency_detected) {
         setCurrency(result.currency_detected);
+      } else if (userCurrency) {
+        setCurrency(userCurrency);
       }
 
-      if (result.currency_required && !userCurrency) {
-        setStep('currency_selection');
-        return;
-      }
+      setStep('currency_selection');
     } catch (err) {
       console.error('Upload error:', err);
       setIsUploading(false);
@@ -2463,7 +2488,7 @@ export const SimpleUpload: React.FC = () => {
               margin: 0,
             }}>
               {step === 'file_upload' && (isUploading ? 'Analyzing your statement...' : (!bankName && !showNewBankInput) ? 'Select your bank to get started' : 'Upload your bank statement')}
-              {step === 'currency_selection' && 'Select your currency'}
+              {step === 'currency_selection' && (userCurrency ? 'Confirm or change your currency' : 'Select your currency')}
               {step === 'header_mapping' && (isAutoDetected ? 'Review detected columns' : 'Map statement columns')}
             </p>
           </div>
@@ -2912,7 +2937,13 @@ export const SimpleUpload: React.FC = () => {
           )}
 
           {/* Step 2: Currency Selection */}
-          {step === 'currency_selection' && (
+          {step === 'currency_selection' && (() => {
+            const searchLower = currencySearch.toLowerCase();
+            const filtered = COMMON_CURRENCIES.filter(c =>
+              c.toLowerCase().includes(searchLower) ||
+              (CURRENCY_INFO[c] || '').toLowerCase().includes(searchLower)
+            );
+            return (
             <div>
               <label style={{
                 display: 'block',
@@ -2936,23 +2967,116 @@ export const SimpleUpload: React.FC = () => {
                 <strong>Your functional currency</strong> is the main currency you transact in — the one the dashboard displays everything in.
                 {' '}NumbyAI supports statements in any currency, but all amounts are converted to your functional currency (at that month's average exchange rate) so your dashboard totals stay consistent.
               </div>
-              <select
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  marginBottom: '16px',
-                }}
-              >
-                <option value="">Select currency...</option>
-                {COMMON_CURRENCIES.map(curr => (
-                  <option key={curr} value={curr}>{curr}</option>
-                ))}
-              </select>
+              <div ref={currencyDropdownRef} style={{ position: 'relative', marginBottom: '16px' }}>
+                <div
+                  onClick={() => setCurrencyDropdownOpen(true)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    width: '100%',
+                    padding: '12px',
+                    border: `1px solid ${currencyDropdownOpen ? '#3b82f6' : '#d1d5db'}`,
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    background: '#fff',
+                    cursor: 'text',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  {currency && !currencyDropdownOpen && (
+                    <span style={{ fontWeight: 600, color: '#111827', flexShrink: 0 }}>
+                      {currency}
+                    </span>
+                  )}
+                  <input
+                    type="text"
+                    placeholder={currency ? `${currency} — ${CURRENCY_INFO[currency] || 'Search...'}` : 'Search currencies...'}
+                    value={currencySearch}
+                    onChange={(e) => {
+                      setCurrencySearch(e.target.value);
+                      setCurrencyDropdownOpen(true);
+                    }}
+                    onFocus={() => setCurrencyDropdownOpen(true)}
+                    style={{
+                      border: 'none',
+                      outline: 'none',
+                      flex: 1,
+                      fontSize: '14px',
+                      color: '#374151',
+                      background: 'transparent',
+                      minWidth: 0,
+                    }}
+                  />
+                  {currency && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCurrency('');
+                        setCurrencySearch('');
+                        setCurrencyDropdownOpen(true);
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#9ca3af',
+                        cursor: 'pointer',
+                        fontSize: '16px',
+                        padding: '0 2px',
+                        lineHeight: 1,
+                        flexShrink: 0,
+                      }}
+                    >
+                      \u00d7
+                    </button>
+                  )}
+                </div>
+                {currencyDropdownOpen && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                    border: '1px solid #d1d5db',
+                    borderTop: 'none',
+                    borderRadius: '0 0 8px 8px',
+                    background: '#fff',
+                    zIndex: 10,
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                  }}>
+                    {filtered.length === 0 ? (
+                      <div style={{ padding: '12px', color: '#9ca3af', fontSize: '13px', textAlign: 'center' }}>
+                        No currencies match your search
+                      </div>
+                    ) : filtered.map(c => (
+                      <div
+                        key={c}
+                        onClick={() => {
+                          setCurrency(c);
+                          setCurrencySearch('');
+                          setCurrencyDropdownOpen(false);
+                        }}
+                        style={{
+                          padding: '10px 12px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          backgroundColor: c === currency ? '#eff6ff' : 'transparent',
+                          fontSize: '14px',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = c === currency ? '#dbeafe' : '#f9fafb')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = c === currency ? '#eff6ff' : 'transparent')}
+                      >
+                        <span style={{ fontWeight: 600, color: '#111827' }}>{c}</span>
+                        <span style={{ color: '#6b7280', fontSize: '13px' }}>{CURRENCY_INFO[c]}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
               <button
                 onClick={handleCurrencySave}
                 disabled={!currency}
@@ -2968,10 +3092,11 @@ export const SimpleUpload: React.FC = () => {
                   cursor: currency ? 'pointer' : 'not-allowed',
                 }}
               >
-                Set Currency & Continue
+                {userCurrency ? 'Confirm Currency & Continue' : 'Set Currency & Continue'}
               </button>
             </div>
-          )}
+            );
+          })()}
 
 
           {/* Step 4: Header Mapping - Lunch Money Style */}
