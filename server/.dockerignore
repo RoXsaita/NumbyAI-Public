@@ -1,0 +1,33 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Database files
+*.db
+*.db.bak
+*.sqlite
+*.sqlite3
+
+# Python virtualenv
+.venv/
+__pycache__/
+*.pyc
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Uploads and logs (runtime data)
+uploads/
+logs/
+
+# Dev tooling
+.coverage
+htmlcov/
+temp/**/*.json
+temp/**/*.csv
+temp/**/*.txt
+
+# IDE
+.vscode/
+.idea/

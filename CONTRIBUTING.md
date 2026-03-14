@@ -20,18 +20,22 @@ alembic upgrade head
 cd ../web
 npm install && npm run build
 
-# Start the server
+# Start the server (macOS / Linux)
 cd ..
 make restart
+
+# Or cross-platform (Windows / macOS / Linux)
+python run.py start
 ```
 
-App runs at http://localhost:8000. You need [Ollama](https://ollama.com) running locally (`make setup-ollama` handles this).
+App runs at http://localhost:8000. You need [Ollama](https://ollama.com) running locally (`make setup-ollama` or `python run.py setup-ollama` handles this).
 
 ## Running tests
 
 ```bash
 # Python: lint + types + tests
-make check-python
+make check-python          # macOS / Linux
+python run.py check        # cross-platform
 
 # Or individually from server/
 ruff check app tests
@@ -57,7 +61,7 @@ test: add fixture for Barclays business account
 chore: bump ruff to 0.9
 ```
 
-One concern per commit. Keep commits small and focused — see [CLAUDE.md](CLAUDE.md) for the full conventions used in this repo.
+One concern per commit. Keep commits small and focused.
 
 ## What to work on
 

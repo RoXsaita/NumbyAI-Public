@@ -1,10 +1,10 @@
-# Web Widgets
+# NumbyAI Frontend
 
-React-based widget components for the Finance Budgeting App dashboard.
+React SPA for the NumbyAI dashboard. Built with esbuild, served by FastAPI as static files.
 
 ## Overview
 
-This package contains the frontend widgets that display financial data from the MCP server. The primary widget is the Dashboard, which provides:
+The frontend renders the full NumbyAI dashboard:
 - Overview metrics (inflows, outflows, net cash)
 - Cashflow P&L view
 - Spending trends visualization
@@ -18,26 +18,28 @@ This package contains the frontend widgets that display financial data from the 
 web/
 ├── src/
 │   ├── widgets/
-│   │   └── dashboard.tsx    # Main dashboard widget (4500+ lines)
+│   │   └── dashboard.tsx    # Main dashboard (~9000 lines)
 │   ├── components/
+│   │   ├── SimpleUpload.tsx  # Upload wizard
 │   │   └── ErrorBoundary.tsx
 │   ├── lib/
-│   │   ├── chart-builders.ts      # Chart rendering utilities
-│   │   ├── data-transformers.ts   # Data processing
-│   │   └── validation.ts          # Schema validation
+│   │   ├── api-client.ts         # Backend REST API client
+│   │   ├── chart-builders.ts     # Chart rendering utilities
+│   │   ├── data-transformers.ts  # Data processing
+│   │   └── validation.ts         # Schema validation
 │   ├── shared/
-│   │   ├── schemas.ts     # Zod schemas matching backend
+│   │   ├── schemas.ts     # Zod schemas matching backend Pydantic schemas
 │   │   └── logger.ts      # Client-side logging
 │   ├── mocks/
-│   │   └── dashboard-mock-data.ts
+│   │   └── dashboard-mock-data.ts  # Used when DATA_SOURCE=mock
 │   └── __tests__/
+│       ├── api-client.test.ts
 │       ├── mutate-categories.test.ts
 │       └── schema-compat.test.ts
 ├── scripts/
-│   ├── build-widgets.mjs   # Widget bundler
-│   └── validate-mock-data.mjs
-├── package.json
-└── widgets.config.json     # Widget configuration
+│   ├── build-app.mjs            # App bundler (esbuild)
+│   └── validate-mock-data.mjs   # Mock data schema validator
+└── package.json
 ```
 
 ## Dashboard Tabs
@@ -56,18 +58,17 @@ web/
 # Install dependencies
 npm install
 
-# Build widgets
+# Build the app (production)
 npm run build
+
+# Build with mock data (no backend needed)
+DATA_SOURCE=mock npm run build:dev
 
 # Run tests
 npm test
 ```
 
-## Usage
-
-The dashboard widget receives data from the MCP server's `get_financial_data` tool and renders it using:
-- `structuredContent` - AI-friendly data summary
-- `_meta` - Full widget props including pivot table with budgets
+No separate dev server -- FastAPI serves `web/dist/` as static files. After changing frontend code, run `npm run build` and refresh.
 
 ## Testing
 
@@ -75,6 +76,6 @@ The dashboard widget receives data from the MCP server's `get_financial_data` to
 # Run all tests
 npm test
 
-# Validate mock data against schemas
-npm run validate-mocks
+# Validate mock data against Zod schemas
+npm run validate:mock
 ```

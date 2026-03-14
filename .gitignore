@@ -92,3 +92,7 @@ test-results/
 
 # Remotion (video tooling — not part of the app)
 video-enhancement/
+
+# Local brand assets (not part of the app)
+NumbyAI Favicon.png
+NumbyAI Logo.png
