@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     # CORS - comma-separated list of allowed origins
     allowed_origins: str = "http://localhost:3000,http://localhost:5173"
 
-    # LLM provider. Currently only "ollama" is supported.
+    # LLM provider. Supported: "ollama" (default), "minimax".
     llm_provider: Optional[str] = None
     llm_timeout_seconds: int = 300
 
@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     ollama_think: Optional[bool] = False
     # None => use Ollama's model default (typically 32768 for qwen3.5:9b).
     ollama_num_ctx: Optional[int] = None
+
+    # MiniMax (cloud LLM — OpenAI-compatible API)
+    minimax_api_key: Optional[str] = None
+    minimax_base_url: str = "https://api.minimax.io/v1"
+    minimax_model: str = "MiniMax-M2.5"
+
     categorization_batch_size: int = 20
     categorization_max_workers: int = 5
     
