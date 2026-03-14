@@ -1,4 +1,4 @@
-.PHONY: restart stop logs ensure-venv ensure-python-tools ensure-frontend setup-ollama test-e2e check-python clear-db
+.PHONY: restart restart-dev stop logs ensure-venv ensure-python-tools ensure-frontend setup-ollama test-e2e check-python clear-db
 
 LOG_DIR ?= $(CURDIR)/server/logs
 LOG_FILE ?= $(LOG_DIR)/numbyai-backend.log
@@ -103,6 +103,15 @@ restart: ensure-venv ensure-frontend
 	@echo ""
 	@echo "Opening frontend in browser..."
 	@open http://localhost:8000 2>/dev/null || xdg-open http://localhost:8000 2>/dev/null || echo "  (Please open http://localhost:8000 manually)"
+
+restart-dev: clear-db restart		## Fresh restart with seeded demo data (full-year 2024 USD dataset)
+	@echo ""
+	@echo "Step 6: Seeding demo data..."
+	@cd server && .venv/bin/python scripts/seed_demo_data.py && echo "✓ Demo data seeded" || echo "✗ Seed script failed"
+	@echo ""
+	@echo "=========================================="
+	@echo "✓ Dev environment ready with demo data!"
+	@echo "=========================================="
 
 logs:
 	@if [ -f $(LOG_FILE) ]; then \
