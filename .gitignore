@@ -89,6 +89,7 @@ test-results/
 *.mov
 *.avi
 *.mkv
+videos/
 
 # Remotion (video tooling — not part of the app)
 video-enhancement/
